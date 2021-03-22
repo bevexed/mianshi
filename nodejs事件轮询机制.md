@@ -31,4 +31,5 @@
 
 
 
-> Process.nextTick 可以在任何阶段优先制先
+> Process.nextTick 可以在任何阶段优先执行
+
