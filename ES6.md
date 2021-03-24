@@ -19,4 +19,21 @@
 
 1. for ...  of
 
- 
+
+
+## Class 
+
+
+
+
+
+## async
+
+`Generator` 函数的语法糖
+
+
+
+## 装饰器（Decorator）
+
+一般和类相关，普通函数少用
+
