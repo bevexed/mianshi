@@ -26,7 +26,7 @@
 
 > 在 CACHE 和 NETWORK 中有一个相同资源，CACHE 优先级更高
 
-- FALLBACK：访问资源任一资源失败后，就会使用第二个资源来替代他 
+- FALLBACK：访问第一个资源失败后，就会使用第二个资源来替代他
 
 ```
 CACHE MANIFEST
