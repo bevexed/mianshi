@@ -1,6 +1,6 @@
 ## React生命周期
 
-### 16
+## 16
 
 #### 挂载卸载过程
 
@@ -55,4 +55,79 @@ render函数会插入jsx生成的dom结构，react会生成一份虚拟dom树，
 
 
 
-### 17
+![image-20210326093920948](react%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F/image-20210326093920948.png)
+
+
+
+#### 总结
+
+1. 初始化阶段：由 ReactDOM.render() 触发第一次渲染
+
+   1. constructor
+
+   2. componentWillMount
+
+   3. render
+
+   4. componentDidMount 
+
+      > 常用，做初始化的事，例如：开启定时器、发送网络请求、订阅消息
+
+2. 更新阶段：由组件内部的 this.setState() 或 父组件 render 触发
+
+   1. shuoldComponentUpdate
+   2. componentWillUpdate
+   3. render
+   4. componentDidUpdate
+
+3. 卸载阶段：由 ReactDOM.unmountComponentAtNode() 触发
+
+   1. componentWillUnmount
+
+      > 常用，做收尾的事。例如：关闭定时器，取消订阅消息
+
+## 17
+
+
+
+#### 总结
+
+1. 初始化阶段：由 ReactDOM.render() 触发第一次渲染
+
+   1. constructor
+
+   2. getDerivedStateFormProps
+
+   3. render
+
+   4. componentDidMount 
+
+      > 常用，做初始化的事，例如：开启定时器、发送网络请求、订阅消息
+
+2. 更新阶段：由组件内部的 this.setState() 或 父组件 render 触发
+
+   1. getDerivedStateFormProps
+   2. shuoldComponentUpdate
+   3. render
+   4. getSnapshotBeforeUpdate
+   5. componentDidUpdate
+
+3. 卸载阶段：由 ReactDOM.unmountComponentAtNode() 触发
+
+   1. componentWillUnmount
+
+      > 常用，做收尾的事。例如：关闭定时器，取消订阅消息
+
+ ![image-20210326103440940](react%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F/image-20210326103440940.png)
+
+
+
+## 16和17的区别
+
+1. 废弃了 3个 will 钩子
+   1. componentWillMount
+   2. componentWillReceiveProps
+   3. componentWillUpdate
+2. 新提出 2个
+   1. getDerivedStateFromProps
+   2. getSnapshotBeforeUpdate
