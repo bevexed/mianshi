@@ -21,6 +21,15 @@
 
 
 
+## 优化
+
+1. 多线程打包
+2. exclude、include
+3. 缓存
+4. DCE
+
+
+
 ![image-20210412143758290](webpack%E5%92%8Cgulp%E5%8E%9F%E7%90%86/image-20210412143758290.png)
 
 ![image-20210412143823411](webpack%E5%92%8Cgulp%E5%8E%9F%E7%90%86/image-20210412143823411.png)
