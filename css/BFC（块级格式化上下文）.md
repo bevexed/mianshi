@@ -11,7 +11,7 @@ BFC 即 **块级格式化上下文**。
 
 Box是CSS布局的基本单位，一个页面由多个Box组成。
 
-- 元素的类型和dispaly属性，决定box属性
+- 元素的类型和display属性，决定box属性
 - 不同类型的Box，会参与不同的Formatting Context，因此Box内的元素会以不同的方式渲染
   - block-level box：display 属性为 block、list-item、table 的元素，会生成 block-level box，并参与 block formatting content
   - inline-level box：display 属性为 inline、inline-block、inline-table 的元素，会生成 inline-level box，并参与 inline formatting content
@@ -38,15 +38,22 @@ Box是CSS布局的基本单位，一个页面由多个Box组成。
 
 ### 如何创建BFC
 
-- float的值不能是none
-- position的值不能static、relative
-- display的值是inline-block、table-cell、flex、table-caption、inline-flex
-- overflow的值不是visible
+- html 根元素是创建BFC的元素
+- 浮动元素： float的值不能是none
+- 绝对定位元素：position 的值除了 static、relative 以外的值 (absolute、fixed)
+- display的值是 inline-block、table-cell、flex、table-caption、inline-flex
+- overflow 的值除了 visible 以外的值 (hidden、auto、scroll)
+
 
 
 
 ### BFC作用
 
 1. 利用BFC避免margin重叠
-2. 自适应两栏布局
+2. BFC 可以阻止元素被浮动元素覆盖,所以可以实现 自适应两栏布局
 3. 清除浮动
+  > float为left/right是子元素本身触发了BFC，使普通布局流变成了浮动流布局；父级元素因为浮动从而高度塌陷，所以需要overflow来触发父级元素的BFC来重新布局回到普通布局
+
+
+## 参考文章
+- [10 分钟理解 BFC 原理](https://zhuanlan.zhihu.com/p/25321647)
