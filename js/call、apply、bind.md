@@ -1,17 +1,16 @@
 ### 比较 call、apply、bind
 
-Function 是函数对象的构造方法，call、apply、bind 都是韩式原型上方法，作为实例，他自身也有这3个方法
+Function 是函数对象的构造方法，call、apply、bind 都是原型上方法，作为实例，他自身也有这3个方法
 
 #### 相同点
 
 改变执行上下文（this）
 
-
-
 #### 不同处
 
 - call、apply的区别：接受参数的方式不一样。
   - apply 接收数组
+  - call 正常传参形式
 - bind：不立即执行。而apply、call 立即执行。
 
 
@@ -26,5 +25,3 @@ Function 是函数对象的构造方法，call、apply、bind 都是韩式原型
 - 箭头函数不可以使用 arguments 对象，该对象在函数体内不存在。
 - 如果要用，可以用 Rest 参数代替；
 - 不可以使用 yield 命令，因此箭头函数不能用作 Generator 函数。
-  
-
