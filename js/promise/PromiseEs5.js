@@ -1,7 +1,3 @@
-## 原理
-- 发布订阅模式
-
-```js
 const PENDING = 'pending'
 const RESOLVED = 'resolved'
 const REJECTED = 'rejected'
@@ -44,5 +40,11 @@ Promise.prototype.catch = function (fn){
   return this.then(null, fn)
 }
 
-```
 
+new Promise((resolve,reject)=>{
+  resolve(1)
+}).then(res=>{
+  console.log(res);
+}).then(err=>{
+  console.log(err);
+})
