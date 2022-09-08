@@ -16,7 +16,7 @@ componentWillMount()一般用的比较少，它更多的是在服务端渲染时
 
 组件第一次渲染完成，此时dom节点已经生成，可以在这里调用ajax请求，返回数据setState后组件会重新渲染
 
-##### componenWillUnmount()
+##### componentWillUnmount()
 
 在此处完成组件的卸载和数据的销毁。
 
@@ -45,9 +45,9 @@ componentWillMount()一般用的比较少，它更多的是在服务端渲染时
 
 shouldComponentUpdate返回true以后，组件进入重新渲染的流程，进入componentWillUpdate,这里同样可以拿到nextProps和nextState。
 
-##### compoenntDIdUpdate(prevProps,prevState)
+##### componentDIdUpdate(prevProps,prevState)
 
-组件更新完毕后，react只会在第一次初始化成功会进入componentDidmount,之后每次重新渲染后都会进入这个生命周期，这里可以拿到prevProps和prevState，即更新前的props和state。
+组件更新完毕后，react只会在第一次初始化成功会进入componentDIdMount,之后每次重新渲染后都会进入这个生命周期，这里可以拿到prevProps和prevState，即更新前的props和state。
 
 ##### render()
 
@@ -55,7 +55,7 @@ render函数会插入jsx生成的dom结构，react会生成一份虚拟dom树，
 
 
 
-![image-20210326093920948](react%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F/image-20210326093920948.png)
+![image-20210326093920948](react生命周期/image-20210326093920948.png)
 
 
 
@@ -69,13 +69,13 @@ render函数会插入jsx生成的dom结构，react会生成一份虚拟dom树，
 
    3. render
 
-   4. componentDidMount 
+   4. componentDidMount
 
       > 常用，做初始化的事，例如：开启定时器、发送网络请求、订阅消息
 
 2. 更新阶段：由组件内部的 this.setState() 或 父组件 render 触发
 
-   1. shuoldComponentUpdate
+   1. shouldComponentUpdate
    2. componentWillUpdate
    3. render
    4. componentDidUpdate
@@ -100,14 +100,14 @@ render函数会插入jsx生成的dom结构，react会生成一份虚拟dom树，
 
    3. render
 
-   4. componentDidMount 
+   4. componentDidMount
 
       > 常用，做初始化的事，例如：开启定时器、发送网络请求、订阅消息
 
 2. 更新阶段：由组件内部的 this.setState() 或 父组件 render 触发
 
    1. getDerivedStateFormProps
-   2. shuoldComponentUpdate
+   2. shouldComponentUpdate
    3. render
    4. getSnapshotBeforeUpdate
    5. componentDidUpdate
@@ -118,7 +118,7 @@ render函数会插入jsx生成的dom结构，react会生成一份虚拟dom树，
 
       > 常用，做收尾的事。例如：关闭定时器，取消订阅消息
 
- ![image-20210326103440940](react%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F/image-20210326103440940.png)
+ ![image-20210326103440940](react生命周期/image-20210326103440940.png)
 
 
 
