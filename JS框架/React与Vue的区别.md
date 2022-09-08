@@ -21,7 +21,7 @@
    - react jsx
 3. state 对象在 react 中不可改变，需要使用 setState 方法，在 vue 中 state 对象不是必须的，数据由 data 属性在 vue 对象中管理
 4. Virtual DOM 的实现不用，
-   - vue 会跟踪每一个逐渐的依赖关系，不需要重新渲染整个组件数
+   - vue 会跟踪每一个组件的依赖关系，不需要重新渲染整个组件树
    - react ，每当应用状态发生改变，全部组件都会重新渲染，所以 react 中 需要 shouldComponentUpdate 这个 生命周期函数方法来进行控制
 5. React 严格上只针对 MVC 的 view 层，Vue 则是 MVVM 模式
 
