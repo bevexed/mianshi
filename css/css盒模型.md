@@ -5,8 +5,8 @@
 2. IE盒模型
 
 ## css 盒模型区别
-1. 标准盒模型：margin、border、padding、content
-2. IE盒模型：margin、content(border + padding + content)
+1. 标准盒模型(content-box)：margin、border、padding、content
+2. IE盒模型(border-box)：margin、content(border + padding + content)
 
 ## 如何转换盒模型
 display: content-box; 标准盒模型
