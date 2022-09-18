@@ -1,4 +1,4 @@
-### 什么是 flex ，写出常见属性，以及作用
+# 什么是 flex ，写出常见属性，以及作用
 
 1. flex：Flexible Box，弹性布局，用来为盒状模型提供最大的灵活性。可以实现类似**垂直居中**布局。
 2. 常见属性
@@ -16,3 +16,7 @@
       4. flex-basis 在分配多余空间之前，项目占据的主轴空间（main size）。浏览器根据这个属性，计算主轴是否有多余空间。它的默认值为auto，即项目的本来大小。
       5. flex 是flex-grow, flex-shrink 和 flex-basis的简写，默认值为0 1 auto。后两个属性可选。
       6. align-self 允许单个项目有与其他项目不一样的对齐方式，可覆盖align-items属性。默认值为auto，表示继承父元素的align-items属性，如果没有父元素，则等同于stretch
+
+## 详细教程
+1. [Flex 布局教程：语法篇](https://www.ruanyifeng.com/blog/2015/07/flex-grammar.html)
+2. [Flex 布局教程：实例篇](http://www.ruanyifeng.com/blog/2015/07/flex-examples.html)
