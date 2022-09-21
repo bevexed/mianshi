@@ -24,7 +24,7 @@ XSS 即跨站脚本攻击，浏览器向服务器请求的时候注入脚本攻�
 
 
 
-## CSRF（Cross-site request forgety）
+## CSRF（Cross-site request forgery）
 
 跨站请求伪造，黑客通过网站B，诱使用户去访问已经登录了的网站A，进行一些违背用户意愿的请求
 
