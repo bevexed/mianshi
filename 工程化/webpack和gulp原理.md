@@ -1,7 +1,7 @@
 # webpack和gulp的区别
 
 1. webpack基于模块打包，gulp基于任务流打包
-2. webpac适合SAP单页面开发，gulp适合多页面应用开发
+2. webpack适合SAP单页面开发，gulp适合多页面应用开发
 
 
 
