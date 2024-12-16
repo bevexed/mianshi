@@ -34,7 +34,14 @@
 2. 组件的销毁操作是先父后子，销毁完成的顺序是先子后父。
 
 ### 加载渲染过程
-父beforeCreate->父created->父beforeMount->子beforeCreate->子created->子beforeMount- >子mounted->父mounted
+父beforeCreate
+-> 父created
+-> 父beforeMount
+-> 子beforeCreate
+-> 子created
+-> 子beforeMount
+-> 子mounted
+-> 父mounted
 
 ### 子组件更新过程
 父beforeUpdate->子beforeUpdate->子updated->父updated
