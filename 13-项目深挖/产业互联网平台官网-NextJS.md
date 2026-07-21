@@ -18,6 +18,15 @@
 
 ---
 
+> ✅ **已核对 `package.json`**：`next 16.2.6`、`zustand ^5.0.9`、
+> `@tanstack/react-query ^5.90.12`、`framer-motion ^12.23.26` 全部属实。
+> 且 git 记录显示这个仓库**你提交 363 次（shirley 107、陈 17）**，
+> 公共基建文件 **64 个是你建的**——
+> 「从 0 开发云产品购买链路」和「我打地基」在这个项目上**完全立得住**，
+> 是你最有底气的一段。
+
+---
+
 ## 一、RSC 与 App Router（核心必问区）
 
 ### Q1：Server Components 和 Client Components 的区别？
