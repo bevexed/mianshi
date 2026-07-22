@@ -1,27 +1,28 @@
-# new 操作符
+# `new` 操作符
 
-## 具体做了什么
-1. 创建了一个空对象
-2. 将空对象的原型指向构造函数的原型
-3. 改变this指向（将空对象作为构造函数的上下文）
-4. 对构造函数有返回值的处理判断（返回基本类型则忽略，引用类型直接返回引用类型）
+## 对普通构造函数做了什么
+
+1. 创建一个对象，并把它的 `[[Prototype]]` 指向构造函数的 `prototype`。
+2. 以新对象作为 `this` 调用构造函数。
+3. 构造函数显式返回对象或函数时使用该返回值；返回原始值时忽略它。
 
 ```js
-function Fun(name,age){
-  this.name = name
-  this.age = age
-}
+function myNew(Constructor, ...args) {
+	if (typeof Constructor !== 'function') {
+		throw new TypeError('Constructor 必须是函数');
+	}
 
-function create(fn, ...args){
-  // 1. 创建了一个空对象
-  var obj = {}
-  // 2. 将空对象的原型指向构造函数的原型
-  Object.setPrototypeOf(obj, fn.prototype)
-  // 3. 改变this指向（将空对象作为构造函数的上下文）
-  var res = fn.apply(obj,args)
-  // 4. 对构造函数有返回值的处理判断（返回基本类型则忽略，引用类型直接返回引用类型）
-  return res instanceof Object ? res : obj
+	const candidate = Constructor.prototype;
+	const prototype =
+		candidate !== null && (typeof candidate === 'object' || typeof candidate === 'function')
+			? candidate
+			: Object.prototype;
+	const instance = Object.create(prototype);
+	const result = Constructor.apply(instance, args);
+	const isObject = result !== null && (typeof result === 'object' || typeof result === 'function');
+	return isObject ? result : instance;
 }
-
-console.log(create(Fun, '张三', 18));
 ```
+
+这个手写版用于解释普通函数构造过程，不能调用 `class`（class 不能被 `apply`）。
+生产代码若要完整遵循构造语义，直接使用 `Reflect.construct(Constructor, args)`。

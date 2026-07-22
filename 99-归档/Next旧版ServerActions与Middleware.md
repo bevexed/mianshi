@@ -1,4 +1,9 @@
-# Server Actions 与 Middleware
+# Next.js 旧版 Server Actions 与 Middleware
+
+> 归档原因：Next.js 16 将 `middleware` 约定重命名为 `proxy`，
+> 且 Proxy 使用 Node.js runtime。本文关于文件名和 Edge Runtime 的说法已过时。
+> 当前内容见
+> [Server Actions 与 Proxy](../05-React生态/Next.js/ServerActions与Proxy.md)。
 
 ## Server Actions 是什么
 
@@ -7,19 +12,19 @@
 
 ```tsx
 // app/actions.ts
-'use server'
+'use server';
 
 export async function createOrder(formData: FormData) {
-  const title = formData.get('title')
-  await db.order.create({ data: { title } })
-  revalidatePath('/orders')            // 顺便让缓存失效
+	const title = formData.get('title');
+	await db.order.create({ data: { title } });
+	revalidatePath('/orders'); // 顺便让缓存失效
 }
 
 // 组件里直接用
 <form action={createOrder}>
-  <input name="title" />
-  <button>提交</button>
-</form>
+	<input name="title" />
+	<button>提交</button>
+</form>;
 ```
 
 ### 它解决了什么
@@ -60,23 +65,23 @@ export async function deleteOrder(id: string) {
 ```ts
 // middleware.ts
 export function middleware(req: NextRequest) {
-  const token = req.cookies.get('token')
-  if (!token) return NextResponse.redirect(new URL('/login', req.url))
-  return NextResponse.next()
+	const token = req.cookies.get('token');
+	if (!token) return NextResponse.redirect(new URL('/login', req.url));
+	return NextResponse.next();
 }
 
-export const config = { matcher: ['/dashboard/:path*'] }
+export const config = { matcher: ['/dashboard/:path*'] };
 ```
 
 ### 典型用途
 
-| 用途 | 说明 |
-|---|---|
-| **鉴权重定向** | 未登录跳登录页——**在页面渲染前拦截，不会闪一下** |
-| **国际化路由** | 按 `Accept-Language` 或 cookie 重写到 `/zh` / `/en` |
-| **A/B 测试** | 按用户分流重写到不同页面 |
-| **改请求/响应头** | 加安全头、CSP |
-| **地域限制** | 按 IP 归属重定向 |
+| 用途              | 说明                                                |
+| ----------------- | --------------------------------------------------- |
+| **鉴权重定向**    | 未登录跳登录页——**在页面渲染前拦截，不会闪一下**    |
+| **国际化路由**    | 按 `Accept-Language` 或 cookie 重写到 `/zh` / `/en` |
+| **A/B 测试**      | 按用户分流重写到不同页面                            |
+| **改请求/响应头** | 加安全头、CSP                                       |
+| **地域限制**      | 按 IP 归属重定向                                    |
 
 ### 限制（常被追问）
 
@@ -94,6 +99,7 @@ export const config = { matcher: ['/dashboard/:path*'] }
 ## 和你项目的关联
 
 【需确认】你官网项目里：
+
 - 登录鉴权是用 Middleware 做的，还是在页面里判断的？
 - 有没有用 Server Actions？还是仍然走传统 API + react-query？
 

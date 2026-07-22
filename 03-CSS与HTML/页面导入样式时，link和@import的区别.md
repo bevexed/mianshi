@@ -1,4 +1,11 @@
-# 页面导入样式时，link 和 @import 的区别
+# `<link>` 和 CSS `@import`
 
-1. link 比 @import 兼容性好
-2. 先加载 link 后加载 @import
+- `<link rel="stylesheet">` 由 HTML 解析器发现，通常能更早开始请求；
+  还能配合 `media`、`integrity`、`crossorigin`、预加载等 HTML 能力。
+- `@import` 写在样式表中，浏览器通常要先下载并解析父样式表才能发现依赖，
+  容易形成串行请求链，因此不适合关键样式拆包。
+- 两者都参与 CSS 层叠，也都可能阻塞首次渲染；不能概括为“永远先加载 link，
+  再加载 import”，实际时序取决于发现时间、网络和媒体条件。
+
+现代工程优先让构建工具产出明确的 `<link>` 或合并依赖；`@import` 可用于非关键、
+条件明确的样式组织，但要避免深层嵌套。

@@ -1,122 +1,75 @@
-#### 执行上下文（execute context）
+# 执行上下文与 `this`
 
-1. 理解：代码执行的环境
-2. 时机：代码正式执行之前会进入到执行环境
+## 执行上下文
 
-3. 工作：
+执行全局代码、函数或模块时，引擎会建立执行上下文，用来保存当前的词法环境、
+变量环境、`this` 绑定等运行状态。函数调用形成调用栈；函数返回后对应执行上下文出栈。
 
-   1. 创建变量对象
+“变量对象（VO/AO）”是旧版规范和教材中的解释模型，现代 ECMAScript 规范使用
+Lexical Environment、Environment Record 等概念。面试时能说明作用域、闭包和调用栈即可，
+不必把旧术语当成真实 JavaScript 对象。
 
-      1. 变量
-      2. 函数及函数的参数
-      3. 全局：window
-      4. 局部：抽象的但是确实纯在
+## 普通函数的 `this` 看调用方式
 
-   2. 确认 this 的指向
+优先级可以这样记：
 
-      1. 全局：this ---> window
-      2. 局部：this ---> 调用其的对象
+1. `new Fn()`：`this` 是新实例。
+2. `fn.call(x)` / `apply` / `bind`：显式指定；但绑定函数被 `new` 时忽略绑定对象。
+3. `obj.fn()`：`this` 是点号前的接收者 `obj`。
+4. `fn()`：严格模式下是 `undefined`；非严格脚本中通常替换为 `globalThis`。
 
-   3. 创建作用域链
-
-      1. 父级作用域链 + 当前的变量对象
-
-   4. 扩展
-```
-      1. ECObj = {
-        '量对象'：{变量，函数，函数的形参}，
-        scopeChain：父级作用域链 + 当前的变量对象，
-        this：{window || 调用其的对象}
-}
-```
-
-
-## 考题
-### 考题1
 ```js
-function Foo() {
-  getName = function () {
-    console.log(1);
-  }
-  return this
+'use strict';
+
+function show() {
+	return this;
 }
 
-Foo.getName = function () {
-  console.log(2);
-}
-
-Foo.prototype.getName = function () {
-  console.log(3);
-}
-
-var getName = function () {
-  console.log(4);
-}
-
-function getName() {
-  console.log(5);
-}
-
-Foo.getName() // 2
-getName() // 4
-Foo().getName() // 1
-getName() // 1
-new Foo().getName() // 3
-
+const obj = { show };
+obj.show(); // obj
+const detached = obj.show;
+detached(); // undefined
+show.call({ id: 1 }); // { id: 1 }
 ```
 
-### 考题2
+`this` 不是由函数“定义在哪里”决定的；那是普通函数作用域的规则，不是 `this` 的规则。
+
+## 箭头函数的 `this`
+
+箭头函数没有自己的 `this`，它捕获外层词法环境中的 `this`：
+
 ```js
-var o = {
-  a:10,
-  b:{
-    fn:function (){
-      console.log(this.a); // undefind
-      console.log(this); // {fn: f}
-    }
-  }
-}
-
-o.b.fn()
+const counter = {
+	value: 1,
+	later() {
+		setTimeout(() => console.log(this.value), 0); // 捕获 later 的 this
+	}
+};
 ```
 
-### 考题3
+因此 `call` / `apply` / `bind` 不能改写箭头函数的 `this`，箭头函数也不能被 `new`。
+
+## 容易踩坑的调用形式
+
 ```js
-window.name = 'window'
+const user = {
+	name: 'A',
+	getName() {
+		return this.name;
+	}
+};
 
-function A() {
-  this.name = 'A'
-}
+user.getName(); // 'A'
+const getName = user.getName;
+getName(); // 严格模式下 this 是 undefined，读取时报错
 
-A.prototype.getA = function (){
-  console.log(this);
-  return this.name  + 1
-}
-
-let a = new A()
-let funcA = a.getA
-funcA() // this -> window
-
-a.getA() // this -> a
+const { getName: extracted } = user;
+extracted.call({ name: 'B' }); // 'B'
 ```
 
-### 考题4
+方法赋给变量或作为裸回调传递后，接收者信息会丢失；可用包装箭头函数或 `bind` 保留：
+
 ```js
-var length = 10
-function fn(){
-  return this.length + 1;
-}
-
-var obj = {
-  length: 5,
-  test1: function (){
-    return fn()
-  }
-}
-
-obj.test2 = fn
-console.log(obj.test1());
-console.log(fn() , obj.test2());
-console.log(obj.test1() , obj.test2());
+button.addEventListener('click', () => user.getName());
+button.addEventListener('click', user.getName.bind(user));
 ```
-

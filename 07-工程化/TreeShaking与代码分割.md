@@ -9,37 +9,43 @@
 
 ### 失效的常见原因（重点，能列出来才算懂）
 
-**1. 模块是 CommonJS**——无法静态分析
+**1. 模块是 CommonJS 或包含动态导出**——静态分析空间变小
+
 ```js
-import _ from 'lodash'              // ❌ CJS，整个库都打进来
-import { debounce } from 'lodash-es' // ✅ ESM
-import debounce from 'lodash/debounce' // ✅ 精确路径
+import { debounce } from 'some-esm-package'; // ESM 导出便于静态分析
+import debounce from 'some-package/debounce'; // 精确入口可减少不确定性
 ```
 
+现代打包器可以对部分 CommonJS 做互操与优化，
+所以不能仅凭 import 写法断言“整个库一定进 bundle”；应检查包的实际发布格式和产物分析。
+
 **2. 副作用**——打包器不敢删可能有副作用的代码
+
 ```json
 // package.json
 { "sideEffects": false }              // 声明本包无副作用
 { "sideEffects": ["*.css", "*.scss"] } // 精确列出有副作用的文件
 ```
 
-**3. Babel 把 ESM 转成了 CJS**
-`@babel/preset-env` 的 `modules` 要设成 `false`，
-把模块转换交给打包器。
+**3. 上游转换过早把 ESM 变成 CJS**
+使用 Babel 时通常让打包器接收 ESM（例如适配后的 `modules: false`），
+但具体选项应交给框架/构建工具预设，不要重复配置。
 
-**4. 类和对象的属性删不掉**——
-tree shaking 是**模块级/导出级**的，
-一个类里没用到的方法删不掉。
+**4. 动态属性访问与可观察对象让属性级 DCE 变难**——
+tree shaking 主要围绕模块与导出图。类/对象内部能删除到什么程度，
+还取决于压缩器、纯净性分析和代码写法，不存在一律“类方法删不掉”的规则。
 
 ---
 
 ## Code Splitting
 
 三种方式：
+
 - **入口分割**：多入口配置
 - **动态导入**：`import()` → 打包器自动分出一个 chunk。
   React 里配合 `React.lazy` + `Suspense`
-- **公共依赖提取**：`splitChunks`（Webpack）/ `manualChunks`（Rollup/Vite）
+- **公共依赖提取**：`splitChunks`（Webpack）或当前打包器的 chunk 配置。
+  Vite 的底层打包器随版本演进，不应把 `manualChunks` 当成跨版本的唯一答案
 
 ### 核心策略：按「变更频率」分组
 
@@ -61,9 +67,10 @@ tree shaking 是**模块级/导出级**的，
 - **削弱 gzip 效果**——小文件压缩率低
 - HTTP/2 多路复用缓解了但**没有消除**这个问题
 
-> 关联：[04-浏览器与网络/HTTP版本演进.md](../04-浏览器与网络/HTTP版本演进.md)
+> 关联：[04-浏览器与网络/HTTP 版本演进.md](../04-浏览器与网络/HTTP版本演进.md)
 
-**原则**：按变更频率分组，而不是按数量分。
+**原则**：结合路由/使用时机、变更频率、缓存命中、请求优先级和压缩效果分组，
+不是只按文件数或只按依赖类型分。
 
 ---
 
@@ -77,22 +84,17 @@ tree shaking 是**模块级/导出级**的，
 
 **2. 常见大头**
 
-| 库 | 问题 | 解法 |
-|---|---|---|
-| moment | 体积大且默认打包全部 locale | 换 dayjs |
-| lodash | 全量引入 | lodash-es / 精确路径 |
-| echarts | 全量引入 | 按需引入图表类型 |
-| antd 图标 | 全量引入 | 按需 |
-| **react-pdf / pdfjs** | **超大** | `React.lazy` 动态导入 |
+| 库                    | 问题                        | 解法                  |
+| --------------------- | --------------------------- | --------------------- |
+| moment                | 体积大且默认打包全部 locale | 换 dayjs              |
+| lodash                | 全量引入                    | lodash-es / 精确路径  |
+| echarts               | 全量引入                    | 按需引入图表类型      |
+| antd 图标             | 全量引入                    | 按需                  |
+| **react-pdf / pdfjs** | **超大**                    | `React.lazy` 动态导入 |
 
 **3. 再改**——按需引入、动态导入、外部化（CDN + externals）
 
 **4. 验证**——改完再量一次，**留下前后对比数据**
 
-### 你的真实案例
-
-> 我优化微信 H5 打包体积时就是先接了 visualizer 才发现大头在 react-pdf，
-> 在那之前我以为是 antd-mobile。
-> **不量就改，八成改错地方。**
-
-> 详见 [13-项目深挖/工程汇微信H5-授权与构建优化.md](../13-项目深挖/工程汇微信H5-授权与构建优化.md)
+建议把优化结果记录为可复现的对比：同一构建环境、同一路由、
+首屏传输体积、总体积、chunk 数、缓存二次访问和弱网时序。

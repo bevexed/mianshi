@@ -27,14 +27,14 @@ const range = {
 
 ```js
 function* gen() {
-  const x = yield 1      // next(10) 时 x === 10
-  const y = yield x + 1
-  return y
+	const x = yield 1; // next(10) 时 x === 10
+	const y = yield x + 1;
+	return y;
 }
-const it = gen()
-it.next()     // { value: 1, done: false }
-it.next(10)   // { value: 11, done: false }
-it.next(20)   // { value: 20, done: true }
+const it = gen();
+it.next(); // { value: 1, done: false }
+it.next(10); // { value: 11, done: false }
+it.next(20); // { value: 20, done: true }
 ```
 
 ---
@@ -45,9 +45,14 @@ it.next(20)   // { value: 20, done: true }
 
 1. **实现迭代器**——比手写 `next()` 简洁得多
 2. **惰性求值 / 无限序列**
-   ```js
-   function* naturals() { let n = 0; while (true) yield n++ }
-   ```
+
+```js
+function* naturals() {
+	let n = 0;
+	while (true) yield n++;
+}
+```
+
 3. **async/await 的底层原理**——
    `async function` 可以用 Generator + 自动执行器（co 函数）模拟
 4. **Redux-Saga** 用它做副作用管理，
@@ -58,7 +63,8 @@ it.next(20)   // { value: 20, done: true }
 
 ## async/await 和 Generator 的关系
 
-- `async/await` 本质是 **Generator + 自动执行器**的语法糖
+- 可以用 **Generator + 自动执行器**建立理解 `async/await` 的近似心智模型；
+  规范并没有要求引擎必须用 Generator 实现 async 函数
 - Generator 需要手动调 `next()` 驱动，
   async 函数由引擎自动驱动（遇到 await 就等 Promise resolve 后继续）
 
@@ -66,16 +72,26 @@ it.next(20)   // { value: 20, done: true }
 
 ```js
 function co(gen) {
-  const it = gen()
-  return new Promise((resolve, reject) => {
-    function step(val) {
-      const { value, done } = it.next(val)
-      if (done) return resolve(value)
-      Promise.resolve(value).then(step, reject)
-    }
-    step()
-  })
+	const it = gen();
+	return new Promise((resolve, reject) => {
+		function step(method, arg) {
+			let result;
+			try {
+				result = it[method](arg);
+			} catch (error) {
+				reject(error);
+				return;
+			}
+			const { value, done } = result;
+			if (done) return resolve(value);
+			Promise.resolve(value).then(
+				(next) => step('next', next),
+				(error) => step('throw', error)
+			);
+		}
+		step('next');
+	});
 }
 ```
 
-> 关联：[eventloop事件循环.md](eventloop事件循环.md) —— await 之后的代码相当于 `.then` 回调，属于微任务
+> 关联：[eventloop 事件循环.md](eventloop事件循环.md) —— await 之后的代码相当于 `.then` 回调，属于微任务

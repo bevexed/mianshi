@@ -8,7 +8,7 @@
 **2. 模拟私有属性**——不会被 `Object.keys` / `JSON.stringify` 枚举到
 （但 `Object.getOwnPropertySymbols` 能拿到，**不是真私有**）
 
-> 真正的私有用 ES2022 的类私有字段 `#x`，见 [ES2020后新语法.md](ES2020后新语法.md)
+> 真正的私有用 ES2022 的类私有字段 `#x`，见 [ES2020 后新语法.md](ES2020后新语法.md)
 
 **3. Well-known Symbols——定制语言行为**（这是重点）
 
@@ -37,6 +37,6 @@ obj[Symbol.toStringTag] = 'MyType'
   （可以跨 iframe、跨 realm 共享）
 
 ```js
-Symbol('a') === Symbol('a')          // false
-Symbol.for('a') === Symbol.for('a')  // true
+Symbol('a') === Symbol('a'); // false
+Symbol.for('a') === Symbol.for('a'); // true
 ```

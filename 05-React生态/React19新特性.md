@@ -2,16 +2,16 @@
 
 ## 主要变化
 
-| 特性 | 说明 |
-|---|---|
-| **Actions** | `useActionState` / `useFormStatus` / `useOptimistic`，把表单提交的 pending、错误、乐观更新标准化 |
-| **`use` API** | 可以在渲染中读 Promise 和 Context，且**可以写在条件里**（它不是 Hook） |
-| **Server Components 正式化** | RSC 从实验特性变为稳定 |
-| **ref 作为 prop** | 函数组件可直接接收 `ref` prop，`forwardRef` 不再必需 |
-| **文档元数据** | 组件里直接写 `<title>` / `<meta>` / `<link>` 会被自动提升到 `<head>` |
-| **资源预加载 API** | `preload` / `preinit` / `prefetchDNS` / `preconnect` |
-| **ref 清理函数** | ref 回调可以返回清理函数，类似 useEffect |
-| **`<Context>` 直接当 Provider** | 不用写 `<Context.Provider>` 了 |
+| 特性                            | 说明                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **Actions**                     | `useActionState` / `useFormStatus` / `useOptimistic`，把表单提交的 pending、错误、乐观更新标准化 |
+| **`use` API**                   | 可以在渲染中读 Promise 和 Context，且**可以写在条件里**（它不是 Hook）                           |
+| **Server Components 正式化**    | RSC 从实验特性变为稳定                                                                           |
+| **ref 作为 prop**               | 函数组件可直接接收 `ref` prop，`forwardRef` 不再必需                                             |
+| **文档元数据**                  | 组件里直接写 `<title>` / `<meta>` / `<link>` 会被自动提升到 `<head>`                             |
+| **资源预加载 API**              | `preload` / `preinit` / `prefetchDNS` / `preconnect`                                             |
+| **ref 清理函数**                | ref 回调可以返回清理函数，类似 useEffect                                                         |
+| **`<Context>` 直接当 Provider** | 不用写 `<Context.Provider>` 了                                                                   |
 
 > **自动批处理**是 React 18 的特性，不是 19 的——别答错。
 
@@ -21,21 +21,18 @@
 
 ```jsx
 function Form() {
-  const [state, submitAction, isPending] = useActionState(
-    async (prevState, formData) => {
-      const res = await submit(formData)
-      return res.error ? { error: res.error } : { success: true }
-    },
-    null
-  )
+	const [state, submitAction, isPending] = useActionState(async (prevState, formData) => {
+		const res = await submit(formData);
+		return res.error ? { error: res.error } : { success: true };
+	}, null);
 
-  return (
-    <form action={submitAction}>
-      <input name="title" />
-      <button disabled={isPending}>提交</button>
-      {state?.error && <p>{state.error}</p>}
-    </form>
-  )
+	return (
+		<form action={submitAction}>
+			<input name="title" />
+			<button disabled={isPending}>提交</button>
+			{state?.error && <p>{state.error}</p>}
+		</form>
+	);
 }
 ```
 
@@ -45,7 +42,10 @@ function Form() {
 ### useOptimistic
 
 ```jsx
-const [optimisticList, addOptimistic] = useOptimistic(list, (state, newItem) => [...state, newItem])
+const [optimisticList, addOptimistic] = useOptimistic(list, (state, newItem) => [
+	...state,
+	newItem
+]);
 // 提交时立刻把新项加进去展示，失败自动回滚到真实 list
 ```
 
@@ -72,18 +72,15 @@ function Theme() {
 
 ## 一句话总结（加分）
 
-> React 19 的主线是**把之前需要靠库解决的问题收进框架**——
-> 表单状态（以前用 formik / react-hook-form）、
-> 乐观更新（以前自己写）、
-> 数据获取（以前用 react-query）。
+> React 19 把 Action 的 pending/错误状态、乐观更新和资源读取
+> 纳入更一致的 React 协调模型。
 >
 > 但要注意，收进框架不等于取代——
-> `useActionState` 处理不了复杂表单校验，
-> `use` 也不能替代 react-query 的缓存和失效管理。
+> `useActionState` 不是完整的表单校验库，
+> `use` 本身也不提供 TanStack Query 那样的缓存、重试和失效管理。
 
-**最后那句是防守句**——面试官可能追问
-"那 React 19 之后还需要 react-query 吗"，
-要能说清各自的边界。
+常见追问是“React 19 之后还需要 TanStack Query 吗”，
+回答重点是两者处理的层次不同。
 
 ---
 

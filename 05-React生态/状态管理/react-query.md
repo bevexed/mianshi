@@ -14,7 +14,8 @@
 ### 最容易被问倒的点
 
 默认 `staleTime: 0`，意味着数据一拿到就是 stale 的，
-任何重新挂载 / 窗口聚焦都会触发后台重新请求。
+组件重新挂载、窗口重新聚焦或网络重连时，
+陈旧且满足对应选项的活跃查询可能在后台重新请求。
 
 很多人以为"用了 react-query 就有缓存了"，
 其实默认行为是 **先展示缓存、同时后台刷新**（stale-while-revalidate）——
@@ -27,8 +28,8 @@
 三种途径：
 
 1. **时间**——超过 staleTime 自动变 stale
-2. **触发条件**——`refetchOnMount` / `refetchOnWindowFocus` /
-   `refetchOnReconnect`（**默认都开**）
+2. **重新获取触发条件**——`refetchOnMount` / `refetchOnWindowFocus` /
+   `refetchOnReconnect`；默认行为通常还会结合查询是否 stale
 3. **手动**——`queryClient.invalidateQueries({ queryKey })`，
    典型场景是 mutation 成功后让相关列表失效
 
@@ -38,7 +39,7 @@
 
 **这题能看出是不是真用过。**
 
-- **queryKey 就是缓存的唯一标识 + 依赖数组**——
+- **queryKey 是查询缓存的身份标识，也承担声明数据依赖的作用**——
   key 里的任何值变化都会触发重新请求，这是它的核心机制
 - **必须把所有影响结果的参数放进 key**：
   ```js
@@ -94,6 +95,7 @@ export const orderKeys = {
 ```
 
 **要点**：
+
 - **QueryClient 必须每个请求新建**——
   和 Zustand 一样的跨请求污染问题
 - 客户端拿到 dehydrate 的数据后**不会立刻重新请求**（已在缓存里），
@@ -107,44 +109,40 @@ export const orderKeys = {
 
 三种策略，**要能说出取舍**：
 
-| 策略 | 做法 | 取舍 |
-|---|---|---|
-| **invalidate**（最常用） | 让缓存失效，重新请求 | 简单可靠，但多一次请求 |
-| **setQueryData** | 直接改缓存，无需请求 | 快，但要自己保证和服务端一致 |
-| **乐观更新** | `onMutate` 先改 UI，`onError` 回滚 | 体验最好，但要处理失败回滚 |
+| 策略                     | 做法                               | 取舍                         |
+| ------------------------ | ---------------------------------- | ---------------------------- |
+| **invalidate**（最常用） | 让缓存失效，重新请求               | 简单可靠，但多一次请求       |
+| **setQueryData**         | 直接改缓存，无需请求               | 快，但要自己保证和服务端一致 |
+| **乐观更新**             | `onMutate` 先改 UI，`onError` 回滚 | 体验最好，但要处理失败回滚   |
 
 **答题加分**——说清什么时候用哪个：
+
 > 点赞、收藏这种高频轻量操作用乐观更新；
 > 订单提交这种重要操作用 invalidate，
 > 宁可慢也要拿服务端的真实结果。
 
 ```js
 useMutation({
-  mutationFn: updateOrder,
-  onMutate: async (newData) => {
-    await queryClient.cancelQueries({ queryKey })   // 取消在途请求，防止覆盖
-    const prev = queryClient.getQueryData(queryKey) // 存快照
-    queryClient.setQueryData(queryKey, newData)     // 乐观更新
-    return { prev }                                  // 传给 onError
-  },
-  onError: (err, vars, ctx) => queryClient.setQueryData(queryKey, ctx.prev),
-  onSettled: () => queryClient.invalidateQueries({ queryKey }),
-})
+	mutationFn: updateOrder,
+	onMutate: async (newData) => {
+		await queryClient.cancelQueries({ queryKey }); // 取消在途请求，防止覆盖
+		const prev = queryClient.getQueryData(queryKey); // 存快照
+		queryClient.setQueryData(queryKey, newData); // 乐观更新
+		return { prev }; // 传给 onError
+	},
+	onError: (err, vars, ctx) => queryClient.setQueryData(queryKey, ctx.prev),
+	onSettled: () => queryClient.invalidateQueries({ queryKey })
+});
 ```
 
 ---
 
-## 你的项目里怎么分工的
+## 通用的状态分工示例
 
-**准备一个具体例子**（官网选购链路）：
-
-> 产品套餐、版本列表这些是从后端来的，走 react-query，
-> 我不需要关心什么时候刷新。
+> 产品套餐、版本列表是服务端状态，用 TanStack Query 管理查询、缓存和失效。
 >
 > 用户当前选了哪个版本、选了多少年限、加购了哪些项——
-> 这些是纯客户端状态，而且要跨页面保持
-> （购买页选完跳到配置页），放 Zustand。
+> 这些是客户端交互状态；局部使用 `useState`/`useReducer`，
+> 确实跨路由共享时再放入 Zustand 等 store。
 >
 > 价格是**算出来的**，两边都不存。
-
-> 关联：[13-项目深挖/产业互联网平台官网-NextJS.md](../../13-项目深挖/产业互联网平台官网-NextJS.md)

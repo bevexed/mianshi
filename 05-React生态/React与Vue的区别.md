@@ -1,92 +1,62 @@
-#### React 与 Vue 的区别
+# React 与 Vue 的区别
 
-##### 相同点
+## 不要只背 API
 
-1. 都是组件化开发 和 Virtual Dom
-2. 都支持 props 进行父子组件间数据通信
-3. 都支持数据驱动视图，不直接操作真实 DOM，更新状态数据界面自动更新
-4. 都支持服务端渲染
-5. 都支持 native 的方案
-6. **数据流都是单向**（数据流不是数据绑定）
+React 和 Vue 都能完成中大型前端应用。选型应比较编程模型、
+团队经验、生态与存量资产，不应简化成“谁性能更好”。
 
+| 维度       | React                                                         | Vue 3                                                  |
+| ---------- | ------------------------------------------------------------- | ------------------------------------------------------ |
+| 核心定位   | 用于构建 UI 的库，路由和数据层通常由框架/生态补齐             | 渐进式框架，官方提供 Router、Pinia 等协同方案          |
+| UI 表达    | JSX：JavaScript 内组合标记和逻辑                              | SFC 模板为主，也支持 JSX/渲染函数                      |
+| 响应式模型 | state 是渲染快照，调度更新后重新调用组件                      | `ref`/`reactive` 通过代理跟踪依赖，精确触发相关 effect |
+| 优化方式   | 组件边界、状态位置、`memo`、transition，可配合 React Compiler | 模板编译器生成 Patch Flag、静态提升和 Block Tree       |
+| 逻辑复用   | 自定义 Hooks                                                  | Composables（Composition API）                         |
+| 学习曲线   | JavaScript/JSX 抽象空间大，选择也多                           | 模板约定和官方生态较完整，上手路径更集中               |
 
+## 响应式心智模型
 
-##### 不同点
+### React：更新状态快照
 
-1. 数据绑定
-   - vue 双向数据绑定
-   - react 单向数据绑定
-2. 写法不同
-   - vue 模板
-   - react jsx
-3. state 对象在 react 中不可改变，需要使用 setState 方法，在 vue 中 state 对象不是必须的，数据由 data 属性在 vue 对象中管理
-4. Virtual DOM 的实现不用，
-   - vue 会跟踪每一个组件的依赖关系，不需要重新渲染整个组件树
-   - react ，每当应用状态发生改变，全部组件都会重新渲染，所以 react 中 需要 shouldComponentUpdate 这个 生命周期函数方法来进行控制
-5. React 严格上只针对 MVC 的 view 层，Vue 则是 MVVM 模式
+```jsx
+setCount(count + 1);
+// 当次事件回调中的 count 仍是该次渲染的快照
+```
 
-说出 vue 和 react 的生命周期，以及每个阶段都有什么用？
+React 不要求应用数据本身都是 Proxy。组件调用 setter/dispatch 后，
+React 调度一次新渲染，再调和并提交差异。
 
-#### React生命周期
+### Vue：跟踪属性读写
 
-#### 挂载卸载过程
+```js
+const count = ref(0);
+count.value++;
+```
 
-##### constructor()
+Vue 在 effect 运行时记录读取了哪些响应式属性，属性变化后只通知相关 effect。
+这不表示 Vue 没有 Virtual DOM，也不表示 React 每次都重建真实 DOM。
 
-完成了 React 数据的初始化，接收两个参数：props 和 context
+## 组件通信对照
 
-##### componentWillMount()
+| 需求             | React                     | Vue 3                |
+| ---------------- | ------------------------- | -------------------- |
+| 父传子           | props                     | props                |
+| 子通知父         | 回调 prop                 | `emit`               |
+| 内容组合         | `children` / render props | slots                |
+| 跨层依赖         | Context                   | `provide` / `inject` |
+| 本地状态逻辑复用 | custom Hook               | composable           |
 
-componentWillMount()一般用的比较少，它更多的是在服务端渲染时使用。它代表的过程是组件已经经历了constructor()初始化数据后，但是还未渲染DOM时。
+## 双方都会遇到的问题
 
-##### componentDIdMount()
+- 列表需要稳定、有语义的 key，不要在可重排列表中使用 index。
+- 派生数据应尽量计算而不是再存一份，否则容易出现不一致。
+- 订阅、定时器、网络请求和第三方实例都要对称清理。
+- 大列表、高频更新和不合理的全局状态都会带来性能问题，
+  需要用 Profiler/DevTools 先定位。
 
-组件第一次渲染完成，此时dom节点已经生成，可以在这里调用ajax请求，返回数据setState后组件会重新渲染
+## 怎么选
 
-##### componentWillUnmount()
-
-在此处完成组件的卸载和数据的销毁。
-
-1. clear你在组建中所有的setTimeout,setInterval
-2. 移除所有组建中的监听 removeEventListener
-
-#### 更新过程
-
-##### componentWillReceiveProps(nextProps)
-
-在接受父组件改变后的props需要重新渲染组件时用到的比较多
-
-接受一个参数nextProps
-
-通过对比nextProps和this.props，将nextProps的state为当前组件的state，从而重新渲染组件
-
-##### shouldComponentUpdate(nextProps, nextState)
-
-主要用于性能优化(部分更新)
-
-唯一用于控制组件重新渲染的生命周期，由于在react中，setState以后，state发生变化，组件会进入重新渲染的流程，在这里return false可以阻止组件的更新
-
-因为react父组件的重新渲染会导致其所有子组件的重新渲染，这个时候其实我们是不需要所有子组件都跟着重新渲染的，因此需要在子组件的该生命周期中做判断
-
-##### componentWillUpdate(nextProps, nextState)
-
-shouldComponentUpdate返回true以后，组件进入重新渲染的流程，进入componentWillUpdate,这里同样可以拿到nextProps和nextState。
-
-##### componentDIdUpdate(prevProps,prevState)
-
-组件更新完毕后，react只会在第一次初始化成功会进入componentDidMount,之后每次重新渲染后都会进入这个生命周期，这里可以拿到prevProps和prevState，即更新前的props和state。
-
-##### render()
-
-render函数会插入jsx生成的dom结构，react会生成一份虚拟dom树，在每一次组件更新时，在此react会通过其diff算法比较更新前后的新旧DOM树，比较以后，找到最小的有差异的DOM节点，并重新渲染
-
-#### Vue生命周期
-
-- **beforeCreate**
-- **created**
-- **beforeMount**
-- **mounted**
-- **beforeUpdate**
-- **updated**
-- **beforeDestroy**
-- **destroyed**
+- 已有团队能力、组件库和运维经验通常比微基准更重要。
+- 需要 React Native、React Server Components 或特定 React 生态时，React 更自然。
+- 希望用 SFC、官方 Router/Pinia 和编译期模板优化形成一致路径时，Vue 更自然。
+- 存量项目不应仅因为框架偏好重写；先量化现有瓶颈、迁移成本和收益。

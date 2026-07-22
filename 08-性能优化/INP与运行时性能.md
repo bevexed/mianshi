@@ -2,10 +2,12 @@
 
 ## INP 差的根因
 
-**主线程被长任务阻塞**。任何超过 50ms 的任务都算长任务，
-期间浏览器无法响应用户输入。
+常见根因是主线程长任务、事件处理过重、框架提交或样式/布局太慢。
+Long Tasks API 将超过 50ms 的任务标记为长任务，但 INP 还包含处理和呈现延迟，
+不能只看一条 50ms 阈值。
 
 INP 的三段构成：
+
 ```
 INP = 输入延迟（等主线程空闲） + 处理时间（事件handler） + 呈现延迟（渲染下一帧）
 ```
@@ -18,16 +20,23 @@ INP = 输入延迟（等主线程空闲） + 处理时间（事件handler） + �
 
 ```js
 // 让出主线程，给浏览器处理输入的机会
-await scheduler.yield()          // 新 API（Chrome 129+）
-await new Promise(r => setTimeout(r, 0))   // 兼容写法
+if ('scheduler' in globalThis && 'yield' in scheduler) {
+	await scheduler.yield();
+} else {
+	await new Promise((resolve) => setTimeout(resolve, 0));
+}
 ```
 
 大数组处理、复杂计算要分片，不要一次跑完。
+`scheduler.yield()` 的浏览器支持仍需根据目标环境检查；
+`setTimeout(0)` 是降级思路，与 `scheduler.yield()` 的调度优先级语义不完全等价。
 
 ### 2. 减少 hydration 成本
 
-SSR 页面在水合完成前是**"看得见点不动"**的——
-这是 SSR 项目 INP 差的最主要原因。
+SSR 页面在水合前可以显示 HTML，但依赖客户端事件处理器的交互
+可能需等待相关代码与水合。原生链接和具有渐进增强的表单
+可以早于完整水合工作。水合可能是 INP 问题之一，
+但不能不经度量就说是主要原因。
 
 - 减少 Client Component 的量
 - 用流式渲染 + 选择性水合，让重要部分先可交互
@@ -40,11 +49,11 @@ Web Worker 处理数据解析、加解密、大量计算。
 
 ```jsx
 // 输入立即响应，列表渲染可被打断
-setQuery(value)
-startTransition(() => setResults(filter(value)))
+setQuery(value);
+startTransition(() => setResults(filter(value)));
 ```
 
-> 详见 [05-React生态/Fiber与并发特性.md](../05-React生态/Fiber与并发特性.md)
+> 详见 [05-React 生态/Fiber 与并发特性.md](../05-React生态/Fiber与并发特性.md)
 
 ### 5. 事件处理器里别做重活
 
@@ -67,13 +76,13 @@ startTransition(() => setResults(filter(value)))
 
 **3. 常见根因**
 
-| 根因 | 表现 | 修法 |
-|---|---|---|
-| **Context value 每次是新对象** | 所有消费者重渲染 | `useMemo` 稳定 value |
-| **列表没做虚拟滚动** | 几千个 DOM 节点 | react-window / 虚拟滚动 |
-| 大量内联函数/对象 | `memo` 失效 | `useCallback` / 提到外面 |
-| **定时器/订阅没清理** | 越积越多，越来越卡 | effect 里 return 清理函数 |
-| 在渲染中做重计算 | 每次渲染都算一遍 | `useMemo` |
+| 根因                           | 表现               | 修法                      |
+| ------------------------------ | ------------------ | ------------------------- |
+| **Context value 每次是新对象** | 所有消费者重渲染   | `useMemo` 稳定 value      |
+| **列表没做虚拟滚动**           | 几千个 DOM 节点    | react-window / 虚拟滚动   |
+| 大量内联函数/对象              | `memo` 失效        | `useCallback` / 提到外面  |
+| **定时器/订阅没清理**          | 越积越多，越来越卡 | effect 里 return 清理函数 |
+| 在渲染中做重计算               | 每次渲染都算一遍   | `useMemo`                 |
 
 ---
 
@@ -90,18 +99,18 @@ startTransition(() => setResults(filter(value)))
 ```
 
 **难点**：
+
 - **不定高**——需要动态测量并缓存高度
 - **二维虚拟滚动**（横向也要虚拟化）——
-  你的 ratePlan 日历就是这种场景
-
-> 关联：[13-项目深挖/PMS酒店管理系统-国际化.md](../13-项目深挖/PMS酒店管理系统-国际化.md)
+  例如日历/表格既有行虚拟化，又有列虚拟化，还要处理冻结行列与键盘可访问性
 
 ---
 
 ## 动画性能
 
-- **只动 `transform` 和 `opacity`**——
-  这两个属性可以只在合成层处理，**不触发重排重绘**
+- **优先动 `transform` 和 `opacity`**——
+  在合适的分层条件下可以只做合成，通常能避免 layout；
+  是否产生 paint/新合成层仍取决于具体内容和浏览器
 - 改 `width`/`top`/`left` 会触发**重排（reflow）**，代价最大
 - `will-change` 提前提升为合成层，但**别滥用**——
   每个合成层都占显存

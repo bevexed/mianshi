@@ -4,15 +4,15 @@
 
 ```js
 const p = new Proxy(target, {
-  get(t, key, receiver) {},        // 读属性
-  set(t, key, value, receiver) {}, // 写属性
-  has(t, key) {},                  // in 操作符
-  deleteProperty(t, key) {},       // delete
-  ownKeys(t) {},                   // Object.keys / for...in
-  apply(t, thisArg, args) {},      // 函数调用
-  construct(t, args) {},           // new
-  // 共 13 种 trap
-})
+	get(t, key, receiver) {}, // 读属性
+	set(t, key, value, receiver) {}, // 写属性
+	has(t, key) {}, // in 操作符
+	deleteProperty(t, key) {}, // delete
+	ownKeys(t) {}, // Object.keys / for...in
+	apply(t, thisArg, args) {}, // 函数调用
+	construct(t, args) {} // new
+	// 共 13 种 trap
+});
 ```
 
 ---
@@ -21,20 +21,20 @@ const p = new Proxy(target, {
 
 **这是 Vue2 → Vue3 响应式升级的核心原因，必答。**
 
-| | defineProperty（Vue2） | Proxy（Vue3） |
-|---|---|---|
-| 拦截粒度 | **单个属性**，要递归遍历所有属性 | **整个对象**，惰性代理 |
-| 新增属性 | ❌ 检测不到，需要 `Vue.set` | ✅ |
-| 删除属性 | ❌ 需要 `Vue.delete` | ✅ |
-| 数组 | ❌ 索引赋值/length 检测不到，Vue2 靠**重写数组方法**打补丁 | ✅ 原生支持 |
-| Map/Set | ❌ | ✅ |
-| 初始化性能 | 深层对象要递归全部处理 | **用到才代理**（惰性），大对象更快 |
-| 兼容性 | IE9+ | **不支持 IE，无法 polyfill** |
+|            | defineProperty（Vue2）                                     | Proxy（Vue3）                      |
+| ---------- | ---------------------------------------------------------- | ---------------------------------- |
+| 拦截粒度   | **单个属性**，要递归遍历所有属性                           | **整个对象**，惰性代理             |
+| 新增属性   | ❌ 检测不到，需要 `Vue.set`                                | ✅                                 |
+| 删除属性   | ❌ 需要 `Vue.delete`                                       | ✅                                 |
+| 数组       | ❌ 索引赋值/length 检测不到，Vue2 靠**重写数组方法**打补丁 | ✅ 原生支持                        |
+| Map/Set    | ❌                                                         | ✅                                 |
+| 初始化性能 | 深层对象要递归全部处理                                     | **用到才代理**（惰性），大对象更快 |
+| 兼容性     | IE9+                                                       | **不支持 IE，无法 polyfill**       |
 
 最后一行很关键——Proxy 的能力无法用 ES5 模拟，
 这就是为什么 Vue3 直接放弃了 IE。
 
-> 关联：[06-Vue生态/2.0和3.0差异.md](../06-Vue生态/2.0和3.0差异.md)
+> 关联：[06-Vue 生态/2.0 和 3.0 差异.md](../06-Vue生态/2.0和3.0差异.md)
 
 ---
 
@@ -51,14 +51,14 @@ const p = new Proxy(target, {
 
 ```js
 const proxy = new Proxy(obj, {
-  get(target, key, receiver) {
-    // ❌ 直接访问：getter 里的 this 指向 target，绕过了代理
-    // return target[key]
+	get(target, key, receiver) {
+		// ❌ 直接访问：getter 里的 this 指向 target，绕过了代理
+		// return target[key]
 
-    // ✅ 正确转发：this 指向 receiver（代理对象），嵌套属性也能被拦截
-    return Reflect.get(target, key, receiver)
-  }
-})
+		// ✅ 正确转发：this 指向 receiver（代理对象），嵌套属性也能被拦截
+		return Reflect.get(target, key, receiver);
+	}
+});
 ```
 
 如果对象里有 getter 且 getter 内部访问了 `this.other`，
