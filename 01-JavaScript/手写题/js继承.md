@@ -1,87 +1,63 @@
-# js 继承
-1. es6
+# JavaScript 继承
 
-    ```ecmascript 6
-    class Parent {
-      constructor() {
-        this.age = 18
-      }
-    }
+## 现代写法：class `extends`
 
-    class Child extends Parent {
-      constructor() {
-        super();
-        this.name = 'aaa'
-      }
-    }
-    ```
+```js
+class Parent {
+	constructor(name) {
+		this.name = name;
+	}
 
-2. 原型链继承
-   - 存在引用值共享的问题
-      ```javascript
-       function Parent(){
-         this.age = 20
-       }
+	say() {
+		return this.name;
+	}
+}
 
-       function Child(){
-         this.name = 'aaa'
-       }
+class Child extends Parent {
+	constructor(name, age) {
+		super(name); // 派生类在使用 this 前必须调用 super()
+		this.age = age;
+	}
+}
+```
 
-       Child.prototype = new Parent()
+class 没有改变原型继承模型：实例方法仍在 `prototype` 上；
+`extends` 同时建立实例侧和构造函数静态侧的原型关系。
 
-       ```
+## ES5：寄生组合继承
 
-3. 借用构造函数
-   - 没办法拿到原型上的方法
-      ```javascript
-       function Parent(){
-         this.age = 20
-       }
+```js
+function Parent(name) {
+	this.name = name;
+}
 
-       function Child(){
-         this.name = 'aaa'
-         Parent.call(this)
-       }
-       ```
+Parent.prototype.say = function () {
+	return this.name;
+};
 
-4. 组合继承（伪经典继承）
-   - 父构造函数会执行两次
-      ```javascript
-       function Parent(){
-         this.age = 20
-       }
+function Child(name, age) {
+	Parent.call(this, name); // 初始化每个实例自己的属性
+	this.age = age;
+}
 
-       function Child(){
-         this.name = 'aaa'
-         Parent.call(this)
-       }
+Child.prototype = Object.create(Parent.prototype, {
+	constructor: {
+		value: Child,
+		writable: true,
+		configurable: true
+	}
+});
+Object.setPrototypeOf(Child, Parent); // 如需继承静态属性
+```
 
-       Child.prototype = new Parent()
+## 旧方案为什么有问题
 
-       ```
+| 方案                              | 问题                                                |
+| --------------------------------- | --------------------------------------------------- |
+| `Child.prototype = new Parent()`  | 父构造函数中的引用属性会被所有子实例共享            |
+| 只用 `Parent.call(this)`          | 只能拿到实例属性，拿不到 `Parent.prototype` 方法    |
+| 组合继承：`call` + `new Parent()` | 父构造函数执行两次，并在子原型上留下多余实例属性    |
+| 寄生组合继承                      | 用 `Object.create` 连接原型，不执行第二次父构造函数 |
 
-5. 寄生组合继承(经典模式)
-   - 123
-    ```javascript
-    function Parent() {
-      this.age = 20
-    }
-
-    function Child() {
-      this.name = 'aaa'
-      Parent.call(this)
-    }
-
-    if (!Object.create) {
-      Object.create = function (proto){
-        function F() {}
-        F.prototype = proto
-        return new F()
-      }
-
-    }
-
-    Child.prototype = Object.create(Parent.prototype)
-    ```
-
-6. 圣杯模式
+面试重点不是背“六种继承”，而是能画出实例原型链，并解释为什么
+`Object.create(Parent.prototype)` 比 `new Parent()` 更适合建立原型关系。

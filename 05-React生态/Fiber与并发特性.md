@@ -9,7 +9,7 @@
 
 **Fiber 的做法**：
 
-**1. 数据结构改造**——把虚拟 DOM 树变成**链表结构**
+**1. 数据结构改造**——每个 Fiber 节点通过
 （`child` / `sibling` / `return` 三个指针），
 递归改成循环，从而**可以中断和恢复**。
 
@@ -23,10 +23,10 @@
 
 **2. 渲染分两个阶段**：
 
-| 阶段 | 做什么 | 能否中断 | 有无副作用 |
-|---|---|---|---|
+| 阶段                   | 做什么                                  | 能否中断              | 有无副作用   |
+| ---------------------- | --------------------------------------- | --------------------- | ------------ |
 | **render / reconcile** | 计算变更，构建 fiber 树，打 effect 标记 | ✅ **可中断、可丢弃** | 无（必须纯） |
-| **commit** | 把变更应用到真实 DOM | ❌ 同步不可中断 | 有 |
+| **commit**             | 把变更应用到真实 DOM                    | ❌ 同步不可中断       | 有           |
 
 **3. 优先级调度**——不同更新有不同优先级，
 用户输入这类高优先级更新可以打断低优先级的渲染。
@@ -46,6 +46,7 @@
 渲染过程可被打断、暂停、恢复、放弃。
 
 带来的具体特性：
+
 - `useTransition` / `startTransition`——把更新标记为**非紧急**
 - `useDeferredValue`——延迟某个值的更新
 - `Suspense` 的流式渲染
@@ -66,12 +67,12 @@
 transition 控制**渲染优先级**（适合大量 DOM 更新）。
 
 ```jsx
-const [isPending, startTransition] = useTransition()
+const [isPending, startTransition] = useTransition();
 
 // 输入立即响应（紧急）
-setQuery(value)
+setQuery(value);
 // 列表渲染可以被打断（非紧急）
-startTransition(() => setResults(filter(value)))
+startTransition(() => setResults(filter(value)));
 ```
 
 ---
@@ -79,11 +80,12 @@ startTransition(() => setResults(filter(value)))
 ## useDeferredValue
 
 ```jsx
-const deferredQuery = useDeferredValue(query)
-const results = useMemo(() => search(deferredQuery), [deferredQuery])
+const deferredQuery = useDeferredValue(query);
+const results = useMemo(() => search(deferredQuery), [deferredQuery]);
 ```
 
 和 `useTransition` 的区别：
+
 - `useTransition` 要你**能改触发更新的代码**
 - `useDeferredValue` 用在**你只拿到值、改不了上游**的场景
   （比如值来自 props）
@@ -109,14 +111,17 @@ const results = useMemo(() => search(deferredQuery), [deferredQuery])
 
 - **React 17 及以前**：只有 React 事件处理函数内部的 setState 会批处理，
   `setTimeout`、Promise、原生事件里的**不会**
-- **React 18 起**：**自动批处理**，所有场景都合并
+- **React 18 使用 `createRoot` 后**：自动批处理扩展到定时器、Promise
+  和原生事件等常见异步回调
 
 ```js
 // React 17：渲染两次；React 18：渲染一次
 setTimeout(() => {
-  setCount(c => c + 1)
-  setFlag(f => !f)
-}, 0)
+	setCount((c) => c + 1);
+	setFlag((f) => !f);
+}, 0);
 ```
 
-需要跳出批处理时用 `flushSync`（谨慎使用，会强制同步渲染）。
+批处理不会无边界地跨越每一个异步阶段，React 也会在用户事件之间
+保证 DOM 已更新。必须立即读取提交后 DOM 时才考虑 `flushSync`，
+因为它会强制同步刷新并损失并发优化空间。

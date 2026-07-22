@@ -1,12 +1,13 @@
 # 手写 Promise 静态方法
 
 > 原文件为空，本篇补写。
-> 完整的 Promise 实现见 [手写Promise.md](手写Promise.md)，
-> 四个方法的区别见 [../Promise静态方法对比.md](../Promise静态方法对比.md)
+> 完整的 Promise 实现见 [手写 Promise.md](手写Promise.md)，
+> 四个方法的区别见 [../Promise 静态方法对比.md](../Promise静态方法对比.md)
 
 ## Promise.all
 
 **要点（面试官就看这几个）**：
+
 1. 返回 Promise
 2. 用 `Promise.resolve()` 包一层，**兼容非 Promise 的值**
 3. **结果顺序必须和输入顺序一致**——不能用 push
@@ -16,34 +17,34 @@
 
 ```js
 Promise.myAll = function (iterable) {
-  return new Promise((resolve, reject) => {
-    const items = Array.from(iterable)
-    const results = new Array(items.length)
-    let count = 0
+	return new Promise((resolve, reject) => {
+		const items = Array.from(iterable);
+		const results = new Array(items.length);
+		let count = 0;
 
-    if (items.length === 0) return resolve([])
+		if (items.length === 0) return resolve([]);
 
-    items.forEach((item, index) => {
-      Promise.resolve(item).then(
-        value => {
-          results[index] = value                            // ⭐ 按 index 放，保证顺序
-          if (++count === items.length) resolve(results)    // ⭐ 计数器
-        },
-        reject                                              // 任一失败直接 reject
-      )
-    })
-  })
-}
+		items.forEach((item, index) => {
+			Promise.resolve(item).then(
+				(value) => {
+					results[index] = value; // ⭐ 按 index 放，保证顺序
+					if (++count === items.length) resolve(results); // ⭐ 计数器
+				},
+				reject // 任一失败直接 reject
+			);
+		});
+	});
+};
 ```
 
 ### 常见错误写法
 
 ```js
 // ❌ 用 push：并发下完成顺序 ≠ 输入顺序
-results.push(value)
+results.push(value);
 
 // ❌ 用 results.length 判断：按 index 赋值会让 length 提前达标
-if (results.length === items.length) resolve(results)
+if (results.length === items.length) resolve(results);
 ```
 
 ---
@@ -54,16 +55,16 @@ if (results.length === items.length) resolve(results)
 
 ```js
 Promise.myAllSettled = function (iterable) {
-  const items = Array.from(iterable)
-  return Promise.myAll(
-    items.map(item =>
-      Promise.resolve(item).then(
-        value  => ({ status: 'fulfilled', value }),
-        reason => ({ status: 'rejected', reason })
-      )
-    )
-  )
-}
+	const items = Array.from(iterable);
+	return Promise.myAll(
+		items.map((item) =>
+			Promise.resolve(item).then(
+				(value) => ({ status: 'fulfilled', value }),
+				(reason) => ({ status: 'rejected', reason })
+			)
+		)
+	);
+};
 ```
 
 **用 all 复用是最简洁的写法**——
@@ -77,12 +78,12 @@ Promise.myAllSettled = function (iterable) {
 
 ```js
 Promise.myRace = function (iterable) {
-  return new Promise((resolve, reject) => {
-    for (const item of iterable) {
-      Promise.resolve(item).then(resolve, reject)
-    }
-  })
-}
+	return new Promise((resolve, reject) => {
+		for (const item of iterable) {
+			Promise.resolve(item).then(resolve, reject);
+		}
+	});
+};
 ```
 
 **关键理解**：不需要额外判断"是不是第一个"——
@@ -99,28 +100,28 @@ Promise.myRace = function (iterable) {
 
 ```js
 Promise.myAny = function (iterable) {
-  return new Promise((resolve, reject) => {
-    const items = Array.from(iterable)
-    const errors = new Array(items.length)
-    let count = 0
+	return new Promise((resolve, reject) => {
+		const items = Array.from(iterable);
+		const errors = new Array(items.length);
+		let count = 0;
 
-    if (items.length === 0) {
-      return reject(new AggregateError([], 'All promises were rejected'))
-    }
+		if (items.length === 0) {
+			return reject(new AggregateError([], 'All promises were rejected'));
+		}
 
-    items.forEach((item, index) => {
-      Promise.resolve(item).then(
-        resolve,                       // 第一个成功就 resolve
-        err => {
-          errors[index] = err
-          if (++count === items.length) {
-            reject(new AggregateError(errors, 'All promises were rejected'))
-          }
-        }
-      )
-    })
-  })
-}
+		items.forEach((item, index) => {
+			Promise.resolve(item).then(
+				resolve, // 第一个成功就 resolve
+				(err) => {
+					errors[index] = err;
+					if (++count === items.length) {
+						reject(new AggregateError(errors, 'All promises were rejected'));
+					}
+				}
+			);
+		});
+	});
+};
 ```
 
 **和 all 是镜像关系**——
@@ -131,26 +132,11 @@ any 是"收集失败、任一成功就成"。
 
 ## 顺手准备：并发控制池
 
-**比上面四个更常考**，因为它有实际用途：
+并发池需要额外处理同步抛错、并发上限校验、结果顺序和取消语义。
+为避免同一实现维护两份，完整版本统一放在
+[算法-前端专属.md](算法-前端专属.md#九并发控制池高频)。
 
-```js
-async function pool(tasks, limit = 4) {
-  const results = []
-  const running = new Set()
-
-  for (const [i, task] of tasks.entries()) {
-    const p = Promise.resolve(task()).then(r => { results[i] = r })
-    running.add(p)
-    p.finally(() => running.delete(p))
-
-    if (running.size >= limit) await Promise.race(running)
-  }
-
-  await Promise.all(running)
-  return results
-}
-```
-
-**用途**：大文件分片上传、批量请求限流。
+**用途**：大文件分片上传、批量请求限流。注意“限制并发数”不等于限流；
+如果要求每秒最多 N 次，还需要令牌桶、漏桶或显式的时间窗口。
 
 > 见 [12-场景题/大文件上传与断点续传.md](../../12-场景题/大文件上传与断点续传.md)

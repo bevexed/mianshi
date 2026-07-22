@@ -2,13 +2,13 @@
 
 ## Server Component vs Client Component
 
-| | Server Component | Client Component |
-|---|---|---|
-| 运行位置 | **只在服务端**运行 | 服务端预渲染 + 客户端水合 |
-| 能做 | 直接读数据库/文件、用密钥 | 用 hooks、事件、浏览器 API |
-| 不能做 | `useState`/`useEffect`/事件处理 | 直接访问服务端资源 |
-| 打包体积 | **不进 JS bundle** | 进 bundle |
-| 默认 | App Router 里**默认是 Server Component** | 需要 `'use client'` |
+|          | Server Component                         | Client Component           |
+| -------- | ---------------------------------------- | -------------------------- |
+| 运行位置 | **只在服务端**运行                       | 服务端预渲染 + 客户端水合  |
+| 能做     | 直接读数据库/文件、用密钥                | 用 hooks、事件、浏览器 API |
+| 不能做   | `useState`/`useEffect`/事件处理          | 直接访问服务端资源         |
+| 打包体积 | **不进 JS bundle**                       | 进 bundle                  |
+| 默认     | App Router 里**默认是 Server Component** | 需要 `'use client'`        |
 
 ### 为什么 Server Component 可以减少 JS
 
@@ -26,33 +26,35 @@
 
 **这题很多人答错，答对很加分。**
 
-- `'use client'` 标记的是**边界，不是单个组件**——
-  一旦某个文件加了它，
-  **它 import 的所有模块都会被拉进客户端 bundle**
+- `'use client'` 标记的是**客户端模块图的入口边界**——
+  从这个文件通过 `import` 可达的模块会成为客户端模块图的一部分
 - 所以要**把 `'use client'` 尽量往叶子节点推**，
   而不是图省事加在页面顶层（那样整棵树都变成客户端组件，RSC 收益归零）
 
 ### 关键模式：用 children 保住 RSC 收益
 
 ```tsx
-// ❌ 整棵树都变客户端
-'use client'
+// Server Component：在服务端组合两者
 export default function Page() {
-  return <Accordion><HeavyServerContent /></Accordion>
+	return (
+		<Accordion>
+			<HeavyServerContent />
+		</Accordion>
+	);
 }
 
-// ✅ 只有 Accordion 是客户端，内容仍在服务端渲染
-export default function Page() {
-  return <Accordion><HeavyServerContent /></Accordion>
-  // Accordion 内部才有 'use client'
+// Accordion.tsx 是 Client Component，但 children 由服务端创建
+('use client');
+export function Accordion({ children }) {
+	/* ... */
 }
 ```
 
 **原理**：Server Component 可以通过 `children` prop 传给 Client Component，
 交互壳是客户端的、内容仍是服务端的。
 
-> 这和 React 里「用 children 避免子组件重渲染」是同一个机制，
-> 见 [../渲染机制.md](../渲染机制.md)
+关键是不要在 Client Component 中直接 import Server Component；
+由上层 Server Component 完成组合，再把服务端结果作为 prop 传入。
 
 ---
 
@@ -77,12 +79,12 @@ export default function Page() {
 
 ### 解决手段
 
-| 手段 | 适用 |
-|---|---|
-| `useEffect` 里再设置只有客户端才有的状态 | 大多数情况（首屏渲染一致，之后再更新） |
-| `suppressHydrationWarning` | **只用于确实无法避免的**，如时间戳。不是万金油 |
-| `dynamic(() => import(...), { ssr: false })` | 完全不该 SSR 的组件（如依赖 window 的图表库） |
-| **把状态源改成 cookie** | 登录态场景的根本解法 |
+| 手段                                         | 适用                                           |
+| -------------------------------------------- | ---------------------------------------------- |
+| `useEffect` 里再设置只有客户端才有的状态     | 大多数情况（首屏渲染一致，之后再更新）         |
+| `suppressHydrationWarning`                   | **只用于确实无法避免的**，如时间戳。不是万金油 |
+| `dynamic(() => import(...), { ssr: false })` | 完全不该 SSR 的组件（如依赖 window 的图表库）  |
+| **把状态源改成 cookie**                      | 登录态场景的根本解法                           |
 
 ### 登录态是水合问题的重灾区
 
@@ -101,26 +103,32 @@ export default function Page() {
 ```tsx
 // Server Component 里直接 await，不需要 useEffect
 export default async function Page() {
-  const data = await fetch('...').then(r => r.json())
-  return <List data={data} />
+	const data = await fetch('...').then((r) => r.json());
+	return <List data={data} />;
 }
 ```
 
 **优势**：
-- 没有请求瀑布流（服务端到数据库/API 的延迟远小于浏览器到服务端）
-- 不需要 loading 状态管理
+
+- 可以减少一部分客户端往返，并在服务端并行组织数据依赖
+- 可用 Suspense/Streaming 统一组织 loading UI
 - 密钥不暴露
 
 **限制**：
+
 - Server Component 里**不能用 hooks**
 - 数据变化后要刷新得靠 `revalidatePath` / `router.refresh()`
 - **交互性数据仍然需要 react-query 之类的客户端方案**
+
+RSC 不会自动消除数据瀑布；如果组件在 `await` 后才渲染下层，
+下层请求仍可能串行。应尽早启动独立请求，并用组合与 Suspense 拆开边界。
 
 ---
 
 ## Server Component 能传什么给 Client Component
 
 **只能传可序列化的值**：
+
 - ✅ 基本类型、数组、对象、Date、Map、Set、Promise
 - ❌ **函数**（除了 Server Actions）、class 实例、Symbol
 

@@ -1,59 +1,50 @@
 # BFC（Block Formatting Context）
 
-BFC 即 **块级格式化上下文**。
+BFC 是块级盒参与布局的一种独立格式化上下文。它会影响内部块盒的排列、
+浮动参与高度计算以及与外部浮动的关系，但“独立”不等于内部外部完全互不影响。
 
-1. 它是一个独立的渲染区域，只有Block-level Box参与，
-2. 它规定了内部的Block-level Box如何布局，并且与这个区域外部毫不相干。
+## 常见创建方式
 
+- 根元素 `<html>`。
+- `float` 不是 `none`。
+- `position: absolute` 或 `fixed`。
+- `overflow` 不是 `visible` / `clip`。
+- `display: flow-root`。
+- `display: inline-block`、table cell/caption。
+- flex/grid item 在不是 flex/grid/table container 的情况下也会建立 BFC。
 
+`display: flex` 和 `display: grid` 建立的是各自的 flex/grid formatting context，
+它们往往能解决类似隔离问题，但不应简单说“flex 容器就是 BFC”。
 
-### Box：css布局的基本单位
+## 三个高频作用
 
-Box是CSS布局的基本单位，一个页面由多个Box组成。
+### 1. 包含浮动
 
-- 元素的类型和display属性，决定box属性
-- 不同类型的Box，会参与不同的Formatting Context，因此Box内的元素会以不同的方式渲染
-  - block-level box：display 属性为 block、list-item、table 的元素，会生成 block-level box，并参与 block formatting content
-  - inline-level box：display 属性为 inline、inline-block、inline-table 的元素，会生成 inline-level box，并参与 inline formatting content
-  - run-in box：css3 才有
+```css
+.parent {
+	display: flow-root;
+}
+.child {
+	float: left;
+}
+```
 
+父元素建立新的 BFC 后，计算自动高度时会包含内部浮动。新代码优先 `flow-root`，
+而不是用 `overflow: hidden` 顺便触发，因为后者还会裁剪溢出内容。
 
+### 2. 避开外部浮动
 
-### Formatting Context
+BFC 的 border box 不会与同一块格式化上下文中的浮动 margin box 重叠，
+可用于传统的浮动两栏布局。现代布局通常直接用 Flex/Grid。
 
-它是页面的一块渲染区域，并且有一套渲染规则，他决定了子元素将如何定位，以及和其他元素的关系和相互作用。最常见的 Formatting Context 有 Block Formatting Context（BFC） 和 Inline Formatting Context（IFC）
+### 3. 理解 margin 折叠
 
+同一 BFC 中、没有边框/内边距/内容等分隔的相邻块级垂直 margin 可能折叠。
+创建新的 BFC 可以阻止**内部元素的 margin 与上下文外元素**发生某些折叠，
+但同一个 BFC 内相邻普通块的 margin 仍可能折叠。
 
+## 面试回答
 
-### BFC的布局规则
-
-- 内部BOX会在垂直方向，一个接一个的放置
-- Box垂直方向的距离由margin决定。属于同一个BFC的两个相邻Box的margin会发生重叠
-- 每个盒子（块盒和行盒）的margin box 的左边，与包含块border box的左边相接触。浮动也是如此
-- BFC 区域不会与float box 重叠
-- BFC就是页面上的一个隔离的独立容器，容器里面的子元素不会影响到外面的元素
-- 计算BFC的高度时，浮动元素也参与计算
-
-
-
-### 如何创建BFC
-
-- html 根元素是创建BFC的元素
-- 浮动元素： float的值不能是none
-- 绝对定位元素：position 的值除了 static、relative 以外的值 (absolute、fixed)
-- display的值是 inline-block、table-cell、flex、table-caption、inline-flex
-- overflow 的值除了 visible 以外的值 (hidden、auto、scroll)
-
-
-
-
-### BFC作用
-
-1. 利用BFC避免margin重叠
-2. BFC 可以阻止元素被浮动元素覆盖,所以可以实现 自适应两栏布局
-3. 清除浮动
-  > float为left/right是子元素本身触发了BFC，使普通布局流变成了浮动流布局；父级元素因为浮动从而高度塌陷，所以需要overflow来触发父级元素的BFC来重新布局回到普通布局
-
-
-## 参考文章
-- [10 分钟理解 BFC 原理](https://zhuanlan.zhihu.com/p/25321647)
+先说“BFC 是块布局上下文”，再举 `display: flow-root` 包含浮动和 margin 折叠边界。
+不要背成“BFC 内外绝对互不影响”，也不要把所有能形成新布局上下文的 display 值
+都机械归类成 BFC。

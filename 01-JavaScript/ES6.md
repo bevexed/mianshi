@@ -1,41 +1,28 @@
-# ES6新特性
+# ES2015（ES6）常用特性
 
-## let
+ES6 是 ES2015 的历史称呼。常见新增包括：
 
-1. 不存在变量提升
-2. 同一个作用域下不能重复定义同一个名字
-3. 有着严格的作用域 （var 是函数作用域）
+- `let` / `const` 与块级作用域
+- 箭头函数
+- 模板字符串、解构、默认参数、剩余参数和展开语法
+- class、模块 `import` / `export`
+- `Promise`
+- `Map` / `Set` / `WeakMap` / `WeakSet`
+- `Symbol`、Iterator、Generator
 
-## 箭头函数
-1. 箭头函数的 this 在定义时就决定了（this 指向定义时外层定义的第一个普通函数的this），而且不可修改(不受 call、bind、apply 影响)
-2. 不能 new（不能作为构造函数）
-3. 不存在 prototype
-4. 不存在 arguments
+## 两个高频边界
 
-## Set
+### `let` / `const` 也会被创建，但有 TDZ
 
-1. 数组去重
-2. 交集，差集，并集
+词法声明在进入作用域时已经建立绑定，只是在执行声明前处于
+**暂时性死区（TDZ）**，访问会抛出 `ReferenceError`。
+因此“完全不存在提升”是便于记忆但不够严谨的说法。
 
-## Map
+### 箭头函数
 
-1. for ...  of
+- 没有自己的 `this`、`arguments`、`super` 和 `new.target`，从外层词法环境获取。
+- 不能作为构造函数调用，也没有用于构造实例的 `prototype`。
+- 不能作为 Generator 函数。
 
-
-
-## Class
-
-
-
-
-
-## async
-
-`Generator` 函数的语法糖
-
-
-
-## 装饰器（Decorator）
-
-一般和类相关，普通函数少用
-
+`async` / `await` 是 ES2017；类字段、顶层 await 等更新内容见
+[ES2020 后新语法.md](ES2020后新语法.md)。装饰器也不属于 ES2015。

@@ -33,13 +33,13 @@
 
 **答题骨架**：
 
-| | Server Component | Client Component |
-|---|---|---|
-| 运行位置 | 只在服务端运行 | 服务端预渲染 + 客户端水合 |
-| 能做 | 直接读数据库/文件、用密钥 | 用 hooks、事件、浏览器 API |
-| 不能做 | `useState`/`useEffect`/事件处理 | 直接访问服务端资源 |
-| 打包体积 | **不进 JS bundle** | 进 bundle |
-| 默认 | App Router 里**默认是 Server Component** | 需要 `'use client'` |
+|          | Server Component                         | Client Component           |
+| -------- | ---------------------------------------- | -------------------------- |
+| 运行位置 | 只在服务端运行                           | 服务端预渲染 + 客户端水合  |
+| 能做     | 直接读数据库/文件、用密钥                | 用 hooks、事件、浏览器 API |
+| 不能做   | `useState`/`useEffect`/事件处理          | 直接访问服务端资源         |
+| 打包体积 | **不进 JS bundle**                       | 进 bundle                  |
+| 默认     | App Router 里**默认是 Server Component** | 需要 `'use client'`        |
 
 **最关键的一句**：RSC 的核心收益是 **把组件代码本身从客户端 bundle 里去掉**。
 一个用 markdown 解析库渲染的服务端组件，那个库根本不会下发给浏览器——
@@ -48,6 +48,7 @@
 ### Q2：`'use client'` 加在哪？它的边界是怎么传染的？
 
 **这题很多人答错，答对很加分：**
+
 - `'use client'` 标记的是**边界，不是单个组件**——一旦某个文件加了它，
   **它 import 的所有模块都会被拉进客户端 bundle**
 - 所以要**把 `'use client'` 尽量往叶子节点推**，
@@ -57,14 +58,22 @@
 
 ```tsx
 // ❌ 整棵树都变客户端
-'use client'
+'use client';
 export default function Page() {
-  return <Accordion><HeavyServerContent /></Accordion>
+	return (
+		<Accordion>
+			<HeavyServerContent />
+		</Accordion>
+	);
 }
 
 // ✅ 只有 Accordion 是客户端，内容仍在服务端渲染
 export default function Page() {
-  return <Accordion><HeavyServerContent /></Accordion>  // Accordion 内部才有 'use client'
+	return (
+		<Accordion>
+			<HeavyServerContent />
+		</Accordion>
+	); // Accordion 内部才有 'use client'
 }
 ```
 
@@ -73,6 +82,7 @@ export default function Page() {
 **必须有具体案例，泛泛而谈会被识破。**
 
 **水合不匹配的典型成因**（挑你真遇到的讲）：
+
 1. **服务端和客户端渲染出的 HTML 不一致**——最常见是用了
    `Date.now()`、`Math.random()`、`new Date().toLocaleString()`（时区不同）
 2. **访问了只有浏览器有的东西**——`window`/`localStorage`，
@@ -81,6 +91,7 @@ export default function Page() {
 4. **HTML 嵌套非法**——比如 `<p>` 里套 `<div>`，浏览器会自动纠正结构，导致对不上
 
 **解决手段**：
+
 - `useEffect` 里再设置只有客户端才有的状态（首屏渲染一致，之后再更新）
 - `suppressHydrationWarning`（**只用于确实无法避免的，如时间戳**，不是万金油）
 - `dynamic(() => import(...), { ssr: false })` 对完全不该 SSR 的组件
@@ -91,12 +102,12 @@ export default function Page() {
 
 ### Q4：Next.js 的几种渲染/缓存策略，你怎么选的？
 
-| 策略 | 适用 | 你的项目里对应 |
-|---|---|---|
-| **SSG**（静态生成） | 内容不变、人人相同 | 官网产品介绍页 |
-| **ISR**（增量静态再生成） | 内容偶尔变，能容忍短暂陈旧 | 产品套餐列表（运营后台改了，几分钟后生效可接受）|
-| **SSR**（每次请求渲染） | 内容随用户/请求变 | 需要登录态的页面 |
-| **CSR**（客户端渲染） | 强交互、SEO 无所谓 | 选购配置页的实时价格计算 |
+| 策略                      | 适用                       | 你的项目里对应                                   |
+| ------------------------- | -------------------------- | ------------------------------------------------ |
+| **SSG**（静态生成）       | 内容不变、人人相同         | 官网产品介绍页                                   |
+| **ISR**（增量静态再生成） | 内容偶尔变，能容忍短暂陈旧 | 产品套餐列表（运营后台改了，几分钟后生效可接受） |
+| **SSR**（每次请求渲染）   | 内容随用户/请求变          | 需要登录态的页面                                 |
+| **CSR**（客户端渲染）     | 强交互、SEO 无所谓         | 选购配置页的实时价格计算                         |
 
 **答题要点**：官网这个项目**同时用到了多种**——这正是 App Router 的优势，
 可以按路由甚至按组件粒度选择，而不是整个应用一刀切。
@@ -106,6 +117,7 @@ export default function Page() {
 ### Q5：SEO 做了什么？
 
 官网的核心诉求就是获客，SEO 必问：
+
 - App Router 的 **Metadata API**（`export const metadata` 或 `generateMetadata`）
   生成 title/description/og 标签
 - 用 SSG/SSR 保证爬虫拿到的是完整 HTML，而不是空 div
@@ -122,6 +134,7 @@ export default function Page() {
 **⚠️ 这题是陷阱。「按订阅策略计算购买折扣」如果只在前端算，是严重的安全问题。**
 
 **正确答法**：
+
 > 前端算是为了**实时展示**——用户改套餐、改年限、加购时要立刻看到价格变化，
 > 每次都请求后端体验太差。但**下单时的最终价格一定以后端为准**，
 > 前端算出来的价格只是展示，提交时后端会重新计算并校验，不一致就拒绝。
@@ -142,6 +155,7 @@ export default function Page() {
 ### Q8：版本对照表的分组与子项折叠交互，难点在哪？
 
 这题看起来是纯 UI，但可以答出深度：
+
 - **数据结构决定交互复杂度**——对照表是「分组 → 子项 → 每个版本的值」的三维结构，
   渲染成表格时行是分组+子项，列是版本
 - 折叠状态该放哪：放在数据里还是单独的 UI state？
@@ -155,11 +169,11 @@ export default function Page() {
 
 ### Q9：为什么用 Zustand 而不是 Redux / Context？
 
-| 方案 | 为什么没选 |
-|---|---|
-| Context | 无法细粒度订阅，一个值变化导致所有消费组件重渲染；多个 Provider 嵌套地狱 |
+| 方案           | 为什么没选                                                                 |
+| -------------- | -------------------------------------------------------------------------- |
+| Context        | 无法细粒度订阅，一个值变化导致所有消费组件重渲染；多个 Provider 嵌套地狱   |
 | Redux(Toolkit) | 样板代码多，这个项目的全局状态很少（主要是用户信息、选购配置），杀鸡用牛刀 |
-| Zustand | API 极简、支持 selector 细粒度订阅、不需要 Provider、体积小 |
+| Zustand        | API 极简、支持 selector 细粒度订阅、不需要 Provider、体积小                |
 
 **加分**：说清楚 **Zustand 在 Next.js 里的坑**——
 Server 端不能用模块级单例 store，因为服务端是多请求共享同一进程，
@@ -169,6 +183,7 @@ Server 端不能用模块级单例 store，因为服务端是多请求共享同�
 ### Q10：Zustand 和 react-query 怎么分工？
 
 **这题答得清楚说明你真的想过架构：**
+
 - **react-query 管服务端状态**——请求、缓存、失效、重试、后台刷新
 - **Zustand 管客户端状态**——用户当前选了哪个套餐、UI 状态、跨页面的选购配置
 - **最常见的错误是把服务端数据也塞进全局 store**，
@@ -199,6 +214,7 @@ Server 端不能用模块级单例 store，因为服务端是多请求共享同�
 ### Q13：重构验证码组件和登录注册流程，改了什么？
 
 【需确认，简历只写了一句，需要展开】可能的方向：
+
 - 验证码的倒计时状态、防重复发送、多端复用
 - 登录/注册/找回密码的流程状态机
 - Token 存储位置的选择（**localStorage vs httpOnly cookie**）——
