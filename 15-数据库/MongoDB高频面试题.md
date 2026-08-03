@@ -51,7 +51,7 @@ db.runCommand({
 
 ```javascript
 {
-  _id: ObjectId("..."),
+  _id: ObjectId("64f1c2a3b4c5d6e7f8091a2b"),
   tenantId: "t1",
   userId: "u1",             // 引用：用户独立演进、可被多处复用
   items: [                   // 嵌入：订单项随订单快照读取和结算
@@ -105,17 +105,19 @@ db.orders.find(
 
 ### 12. 唯一、稀疏和部分索引有什么区别？
 
-**结论：唯一索引拒绝重复键；稀疏索引只为存在该字段的文档建键；部分索引只为匹配筛选表达式的文档建键。** 例如“同租户的已激活邮箱唯一”适合带 `partialFilterExpression` 的唯一索引。部分索引表达的条件更明确，官方将其视为稀疏索引能力的超集；查询想使用它也必须能满足其筛选条件。
+**结论：唯一索引拒绝重复键；稀疏索引只为存在该字段的文档建键；部分索引只为匹配筛选表达式的文档建键。** 例如“同租户未删除用户的字符串邮箱唯一”适合带 `partialFilterExpression` 的唯一索引。软删除状态应正向建模为 `deleted: false`；查询只有包含或逻辑上蕴含部分筛选条件时，才能使用该索引。
 
 ```javascript
 db.users.createIndex(
   { tenantId: 1, email: 1 },
   {
     unique: true,
-    partialFilterExpression: { email: { $exists: true }, deletedAt: { $exists: false } },
+    partialFilterExpression: { email: { $type: "string" }, deleted: false },
   },
 );
 ```
+
+部分索引支持的筛选表达式与查询使用条件见 [官方 Partial Indexes](https://www.mongodb.com/docs/manual/core/index-partial/)。
 
 ### 13. TTL 索引的过期删除为何不是精确定时器？
 
@@ -172,7 +174,7 @@ db.orders.aggregate([
 
 ### 17. `$lookup` 的用途和成本是什么？
 
-**结论：`$lookup` 在管道中执行同库左外连接，适合补充少量关联数据，不应默认为高频主路径。** 它可能对输入的每批文档访问外部集合；缺少匹配索引、输入集过大、返回数组过宽，都会抬高延迟和内存使用。先在本集合 `$match`/`$limit`，为外部集合 join 条件建索引；若读路径稳定且需要的字段有限，可审视是否冗余一份快照。语义见 [聚合阶段参考](https://www.mongodb.com/docs/manual/reference/operator/aggregation-pipeline/#std-label-agg-pipeline-operator-reference)。
+**结论：`$lookup` 在管道中执行同库左外连接，适合补充少量关联数据，不应默认为高频主路径。** 它可能对输入的每批文档访问外部集合；缺少匹配索引、输入集过大、返回数组过宽，都会抬高延迟和内存使用。只有不改变结果语义，且后续过滤或排序不依赖关联字段时，才把可使用索引的 `$match` 或 `$limit` 提到 `$lookup` 前；同时为外部集合 join 条件建索引。若读路径稳定且需要的字段有限，可审视是否冗余一份快照。语义见 [聚合阶段参考](https://www.mongodb.com/docs/manual/reference/operator/aggregation-pipeline/#std-label-agg-pipeline-operator-reference)。
 
 ## 事务、一致性与副本集
 
@@ -193,12 +195,14 @@ db.products.updateOne(
 
 **结论：只有业务不变量必须跨多个文档、集合、数据库或分片“全成或全败”时才用多文档事务。** 它提供 ACID 原子提交，但比单文档操作有更高性能与可用性代价，且有运行时和资源边界；优先通过正确嵌入、条件更新、幂等与异步补偿减少范围。事务适合转账式余额变更、库存与订单状态必须同步等窄范围临界区，不是把关系表原样搬过来的理由。
 
+拓扑上，standalone 不支持多文档事务；副本集事务要求 FCV 4.0+，分片集群事务要求 FCV 4.2+。若任一 shard 的 `writeConcernMajorityJournalDefault` 为 `false`，该分片集群不能运行事务；跨 shard 写事务若读写到含 arbiter 的 shard，也会报错并中止。详见 [官方 Production Considerations](https://www.mongodb.com/docs/manual/core/transactions-production-consideration/)。
+
 ### 20. read concern、write concern 和 read preference 分别控制什么？
 
 **结论：读关注（read concern）决定读到何种一致性/隔离级别的数据；写关注（write concern）决定写操作等待何种确认；读偏好（read preference）决定驱动把读路由到 primary 还是哪些 secondary。三者彼此独立又共同影响读己之写、延迟和可用性。**
 
 - `readConcern: "local"` 可读节点本地最新数据，故障下可能回滚；`"majority"` 读多数提交数据。事务的跨分片一致快照还需理解 `"snapshot"` 与事务级设置。
-- `w: 1` 是 primary 应用后的确认；`w: "majority"` 等待多数投票成员确认。是否等待 journal 还受 `j`、部署和 `writeConcernMajorityJournalDefault` 等配置影响。
+- `w: 1` 是 primary 应用后的确认；`w: "majority"` 等待计算出的多数数据承载投票成员确认，arbiter 只影响多数票数计算而不能确认写。确认是否包含 journal 持久化还受 `j`、部署和 `writeConcernMajorityJournalDefault` 等配置影响。
 - `readPreference: "primary"` 避免从 secondary 读旧数据；读 secondary 可分担读压力，但应用必须接受复制延迟、选路与读己之写边界。
 
 来源：[Read Concern](https://www.mongodb.com/docs/manual/reference/read-concern/)、[Write Concern](https://www.mongodb.com/docs/manual/reference/write-concern/)、[Replica Set Read and Write Semantics](https://www.mongodb.com/docs/manual/applications/replication/)。
@@ -209,7 +213,9 @@ db.products.updateOne(
 
 ### 22. `w: "majority"` 能保证什么，不能保证什么？
 
-**结论：它表示写操作在返回确认前已得到计算出的多数投票成员确认；与匹配的多数读关注结合，可避免读到会被回滚的多数提交数据。** 这比“primary 已收到”强，但并不表示客户端已经完成了所有外部副作用，不替代跨系统幂等设计，也不能承诺任意故障情形下的零数据损失。journal 持久化边界、成员配置、网络分区、超时与客户端是否收到响应都需按当前部署确认。
+**结论：`w: "majority"` 等待计算出的多数数据承载投票成员确认；arbiter 计入投票成员多数的计算，却不存数据、不能确认写。** 这里的计算结果取“全部投票成员的多数（含 arbiter）”与“数据承载投票成员数量”两者的较小值。因此在 PSA 拓扑中，可能必须让全部数据承载投票成员都可用，否则多数写会超时。
+
+MongoDB 8.0+ 在计算出的多数数据承载投票成员将写持久记录到各自本地 oplog 后即可确认，成员异步应用该写，所以 secondary 上可能暂时尚不可见；旧版本则等待写应用到计算出的多数成员。它比 `w: 1` 更能抵御回滚，但是否 journal 持久化仍受配置影响，也不表示所有副本或外部系统已完成，不能据此承诺任意故障下零数据损失。详见 [官方 Write Concern](https://www.mongodb.com/docs/manual/reference/write-concern/)。
 
 面试中应明确三种强度：
 
@@ -227,7 +233,7 @@ db.products.updateOne(
 
 ### 24. 分片解决什么问题，`mongos`、config server 和 shard 分别做什么？
 
-**结论：分片把一个集合的数据和负载分布到多个 shard，用于突破单副本集的容量或吞吐边界；它增加了路由、运维和查询设计复杂度。** `mongos` 是应用连接的无状态查询路由器；config server replica set 保存集群元数据；每个 shard 保存一部分数据，生产中通常本身是副本集以提供冗余。含分片键的查询可被定向到少量 shard；不含分片键的查询可能 scatter-gather 到所有 shard。
+**结论：分片把一个集合的数据和负载分布到多个 shard，用于突破单副本集的容量或吞吐边界；它增加了路由、运维和查询设计复杂度。** `mongos` 是应用连接的无状态查询路由器；config server replica set 保存集群元数据；每个 shard 都必须部署为副本集，以提供数据冗余与故障转移。含分片键的查询可被定向到少量 shard；不含分片键的查询可能 scatter-gather 到所有 shard。
 
 这是 [官方分片组件](https://www.mongodb.com/docs/manual/core/sharded-cluster-components/) 与 [mongos 路由](https://www.mongodb.com/docs/manual/core/sharded-cluster-query-router/) 的定义；MongoDB 8.0 起 config server 可配置为兼任保存应用数据的 config shard，不能把旧的“config server 永不存用户数据”表述当作所有版本的事实。
 
