@@ -31,6 +31,62 @@ export class OrderModule {}
 | `REQUEST`   | 每个请求创建 | 确实需要请求级上下文，且能接受额外开销 |
 | `TRANSIENT` | 每次注入创建 | 每个消费者需要独立实例                 |
 
+## 循环引用
+
+先区分三类问题：
+
+1. 模块循环：`AModule` 和 `BModule` 互相 `imports`；
+2. Provider 循环：`AService` 和 `BService` 互相注入；
+3. 文件循环：内部文件通过 `index.ts` 桶文件反向导入，形成隐式环。
+
+遇到 `Nest can't resolve dependencies` 或 `imports` 中出现 `undefined` 时，先检查导入路径、Provider 所属模块是否 `exports`、使用方是否 `imports`，以及桶文件循环。缺少导出不等于必须增加反向依赖。
+
+### 优先调整依赖方向
+
+如果两个模块共享独立能力，把该能力抽成第三个边界清晰的模块：
+
+```text
+AModule ──→ SharedCapabilityModule ←── BModule
+```
+
+如果真正的问题是跨多个服务的业务流程，由上层编排服务同时依赖它们：
+
+```text
+CoordinatorService
+  ├──→ TaskService
+  └──→ TokenService
+```
+
+不要为了消除循环，把两个模块的大量业务代码都塞进一个巨大的 `CommonModule`。如果反向调用只是通知任务完成、状态变化或触发后续异步处理，可以发布事件；需要立即拿返回值的请求-响应调用仍应保留显式依赖，不要强行事件化。
+
+### 无法拆开时使用容器机制
+
+模块互相引用时，两侧通过延迟闭包引用对方：
+
+```ts
+@Module({
+	imports: [forwardRef(() => BModule)]
+})
+export class AModule {}
+```
+
+Provider 也互相注入时，还需要在注入点处理：
+
+```ts
+constructor(
+	@Inject(forwardRef(() => BService))
+	private readonly bService: BService
+) {}
+```
+
+`forwardRef()` 让 Nest 延迟解析引用，但不会消除职责耦合，双方实例的创建顺序也不应被依赖。`ModuleRef` 可以在运行阶段获取 Provider，适合动态 Provider、插件或特殊生命周期；常规代码中它会隐藏真实依赖，通常不如构造器注入清楚。
+
+### 40 秒面试回答
+
+> 我先区分模块互相导入、Provider 互相注入和 `index.ts` 造成的文件循环。首选是调整职责和依赖方向：公共能力抽成独立模块，跨服务流程放到编排层，只用于通知的反向调用改成事件。确实拆不开时，模块两侧使用 `forwardRef()`，Provider 循环再配合 `@Inject(forwardRef(...))`，特殊动态依赖才考虑 `ModuleRef`。这些 API 解决的是容器加载问题，不等于解决了架构耦合。
+
+参考：[NestJS Circular dependency](https://docs.nestjs.com/fundamentals/circular-dependency)
+
 ## 请求生命周期
 
 一个典型请求大致按以下顺序处理：
