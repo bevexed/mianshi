@@ -111,6 +111,148 @@ Middleware
 | Interceptor      | 调用前后逻辑、日志、超时、响应映射 | 代替领域服务         |
 | Exception Filter | 将未处理异常映射为响应             | 吞掉错误而不记录     |
 
+## 日志体系：Nest Logger、Pino 与 Winston
+
+先分清三层职责：
+
+1. **Nest 日志抽象**：`LoggerService` 统一框架启动日志和业务日志的调用方式。
+2. **结构化与请求上下文**：记录 `requestId`、路由、状态码和耗时，并让 Service 中的日志能关联同一请求。
+3. **输出与采集**：把 JSON 写到 stdout、文件或远程目标，再由日志平台索引、查询和告警。
+
+Interceptor 适合统一记录 HTTP 边界的耗时和结果，但它不会自动覆盖定时任务、队列 Worker、应用启动和领域事件，因此不能把“写了日志 Interceptor”等同于建立了完整日志体系。
+
+### Nest 内置 Logger 与自定义 Logger
+
+Nest 内置 `Logger` 适合开发期输出和简单服务，支持 `fatal`、`error`、`warn`、`log`、`debug`和 `verbose` 等级别与 context：
+
+```ts
+@Injectable()
+export class OrderService {
+	private readonly logger = new Logger(OrderService.name);
+
+	submit(orderId: string) {
+		this.logger.log(`order submitted: ${orderId}`);
+	}
+}
+```
+
+生产环境需要结构化、脱敏或外部日志库时，可以实现 `LoggerService`，也可以使用 Pino/Winston 适配模块。通过容器获取自定义 Logger 时，先缓存启动阶段日志，等依赖注入完成后再替换：
+
+```ts
+const app = await NestFactory.create(AppModule, {
+	bufferLogs: true
+});
+
+app.useLogger(app.get(MyLogger));
+await app.listen(3000);
+```
+
+`bufferLogs` 只解决“自定义 Logger 尚未创建”的启动窗口，不是业务日志的持久化缓冲队列。
+
+### Pino：低开销 JSON 与请求上下文
+
+`nestjs-pino` 内部集成 `pino-http`，可以自动记录请求/响应，并通过 `AsyncLocalStorage` 让同一请求中的业务日志携带请求上下文。一个最小配置如下：
+
+```ts
+// app.module.ts
+@Module({
+	imports: [
+		LoggerModule.forRoot({
+			pinoHttp: {
+				level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+				redact: {
+					paths: ['req.headers.authorization', 'req.headers.cookie'],
+					censor: '[REDACTED]'
+				},
+				transport: process.env.NODE_ENV !== 'production' ? { target: 'pino-pretty' } : undefined
+			}
+		})
+	]
+})
+export class AppModule {}
+
+// main.ts
+const app = await NestFactory.create(AppModule, { bufferLogs: true });
+app.useLogger(app.get(Logger)); // Logger 来自 nestjs-pino
+await app.listen(3000);
+```
+
+`pino-pretty` 需要单独安装，适合开发期阅读；生产应保留机器可解析的 JSON。业务日志应把可查询字段放在对象中，而不是全部拼进字符串：
+
+```ts
+@Injectable()
+export class OrderService {
+	constructor(
+		@InjectPinoLogger(OrderService.name)
+		private readonly logger: PinoLogger
+	) {}
+
+	submit(orderId: string) {
+		this.logger.info({ orderId }, 'order submitted');
+	}
+
+	onError(orderId: string, err: Error) {
+		this.logger.error({ err, orderId }, 'order submit failed');
+	}
+}
+```
+
+`requestId` 应优先接受可信网关传入的值，否则由服务端生成，并回写响应头。它用于关联一次请求的日志；跨服务调用还应传播 trace context，不要把两者概念完全混同。
+
+### Winston：Format 与 Transport 组合
+
+Winston 把日志格式和输出目标拆成可组合的 format/transport。`nest-winston` 可将它适配为 Nest `LoggerService`：
+
+```ts
+// app.module.ts
+@Module({
+	imports: [
+		WinstonModule.forRoot({
+			level: 'info',
+			format: winston.format.combine(
+				winston.format.timestamp(),
+				winston.format.errors({ stack: true }),
+				winston.format.json()
+			),
+			transports: [new winston.transports.Console()]
+		})
+	]
+})
+export class AppModule {}
+
+// main.ts
+const app = await NestFactory.create(AppModule, { bufferLogs: true });
+app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+await app.listen(3000);
+```
+
+Winston 可以为不同 transport 分别设置级别和格式，例如 Console、File、HTTP 或社区 transport。但在容器中，通常优先输出 JSON 到 stdout，由采集器负责轮转和转发；同时直写多个远程 transport 会把外部故障和背压引入应用进程，需要明确失败、缓冲和丢弃策略。
+
+### Pino 与 Winston 怎么选
+
+| 维度          | Pino / `nestjs-pino`                              | Winston / `nest-winston`                             |
+| ------------- | ------------------------------------------------- | ---------------------------------------------------- |
+| 主要取向      | 低开销结构化 JSON，尽量减少请求路径上的格式化成本 | 灵活组合 format 和多种 transport                     |
+| HTTP 请求日志 | `pino-http` 自动记录，可通过 ALS 绑定请求上下文   | 通常需要另外组合 Middleware/Interceptor 和上下文传递 |
+| 输出目标      | 建议保持主线输出简单，在程序外处理美化和采集      | transport 生态和按目标分级/分格式能力较突出          |
+| 适合场景      | API、高并发服务、需要自动请求关联                 | 需要复杂格式、多输出目标或已有 Winston 体系          |
+
+两者都能输出 JSON，也都能接入日志平台。选型不应只背“Pino 更快”：应该用真实日志量、序列化字段、transport 和部署方式压测，同时考虑团队已有采集链路。
+
+### 生产日志的关键约束
+
+- **字段稳定**：统一 `service`、`env`、`version`、`context`、`event`、`requestId`、`traceId`、`durationMs` 和业务主键等字段，不要只记一段难检索的自然语言。
+- **异常可诊断**：记录异常类型、message 和 stack，再附上操作名称与业务键；不要只写“执行失败”。
+- **默认脱敏**：不记录密码、Token、Cookie、验证码、完整证件号和不必要的请求体；脱敏规则要有测试，不能只依赖开发者记得。
+- **控制容量**：健康检查、高频成功请求和可预期 4xx 可按路由降级、采样或关闭自动记录；必须保留错误、慢请求和关键审计事件。
+- **日志不代替其他观测手段**：请求量、错误率和延迟分位数更适合指标，跨服务因果关系使用链路追踪，日志用来保留可检索的事件细节。
+
+### 40 秒日志面试回答
+
+> Nest 的 `LoggerService` 是调用抽象，真正的日志体系还包括请求上下文、结构化字段和采集链路。如果主要是 API 服务，我倾向 `nestjs-pino`，因为它以低开销 JSON 为主，能自动记录 HTTP 并把请求上下文关联到 Service 日志；如果团队需要复杂 format、多 transport 或已有 Winston 体系，我会选 `nest-winston`。生产中会统一 requestId/traceId、业务键、耗时和异常栈，默认对 Token、Cookie 和隐私数据脱敏，同时用级别、采样和保留期控制成本。最后用真实压测和团队运维体系决定选型，不只背某个库更快。
+
+参考：[NestJS Logger](https://docs.nestjs.com/techniques/logger)、[nestjs-pino](https://github.com/iamolegga/nestjs-pino)、[Winston](https://github.com/winstonjs/winston)、[nest-winston](https://github.com/gremo/nest-winston)。
+
 ## Express 与 Fastify 适配器
 
 Nest 默认使用 Express，也可以切换到 Fastify。选择时应基于基准测试、生态兼容性和团队维护成本：
@@ -146,5 +288,8 @@ I/O 密集、TypeScript 团队主导的服务可能适合 Node.js；重计算任
 
 - 能解释依赖注入解决了什么问题，而不只会写装饰器。
 - 能说清 Guard、Pipe、Interceptor 和 Filter 的边界。
+- 能说清 Nest 日志抽象、请求上下文和日志采集三层边界。
+- 能根据结构化性能、请求关联、format/transport 与现有运维体系比较 Pino 和 Winston。
+- 知道生产日志需要稳定字段、脱敏、分级、采样和保留策略。
 - 知道请求级作用域和长事务的成本。
 - 能用约束和测量结果说明选型，不使用“某框架一定更快”的结论。
