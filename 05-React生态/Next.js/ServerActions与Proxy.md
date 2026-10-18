@@ -32,6 +32,16 @@ export async function createOrder(_previous: State, formData: FormData) {
 - 敏感操作增加 CSRF/来源校验、频率限制、审计和幂等性，具体按威胁模型决定。
 - 只向客户端返回可公开数据，不把数据库错误或服务端秘密透出。
 
+## Server Actions 和 Route Handlers 有什么区别？
+
+**面试官：** 关注企业时选哪个？已有独立 NestJS 后端，还需要 Next.js 再写一套业务吗？
+
+**口语参考答案：**
+
+> Server Action 适合由页面交互触发的数据修改，通过框架网络调用执行服务端函数，并能与表单、状态和缓存失效集成。Route Handler 定义明确的 HTTP 接口，适合 API、Webhook 或 BFF。Client Component 可以调用 Server Action。已有 NestJS 时，核心业务规则通常继续由 NestJS 统一负责，Next.js 按需要承担页面相关编排、会话或代理，不必重复实现业务。是否加中间层取决于调用方和边界需求。
+
+**追问与易错点：** Server Action 也可被网络请求触发，每次调用都需要认证、授权、校验和幂等。服务端函数不应只因“从内部按钮调用”就被视为可信。
+
 ## Proxy 是什么
 
 Proxy 在请求完成前运行，适合做轻量、请求边界的重定向、

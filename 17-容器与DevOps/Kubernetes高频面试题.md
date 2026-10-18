@@ -56,6 +56,16 @@ Kubernetes 不负责把有状态业务自动变成无状态，也不能替代数
 
 删除某个 Deployment 管理的 Pod 后，ReplicaSet 会补副本；删除 Deployment 的影响则取决于删除传播策略。生产排障前先查看 `ownerReferences`，避免修错层级。
 
+#### 场景追问：三个 NestJS Pod 的部署、访问与故障恢复
+
+**面试官：** 三副本 NestJS 的一个实例崩溃会怎样？为什么常用 Service？三种 Service 类型有什么区别？
+
+**口语参考答案：**
+
+> Pod 是最小部署单元，包含共享网络等资源的一个或多个容器。Deployment 通过 ReplicaSet 管理副本和滚动更新，Service 给一组匹配的 Pod 提供稳定服务发现与流量入口。容器崩溃时 kubelet 按策略重启容器；受控制器管理的 Pod 需要替换时，控制器补齐副本，新 Pod IP 可能不同。ClusterIP 主要供集群内部访问，NodePort 通过节点端口暴露，LoadBalancer 对接环境中的负载均衡实现。
+
+**追问与易错点：** 容器重启、Pod 替换和跨节点重新调度不同。Pod IP 可以直接访问，但调用方需要自己处理其变化和发现；LoadBalancer 是否可用取决于基础设施。
+
 ### 8. Deployment 的滚动更新和回滚是怎么工作的？
 
 **结论：`RollingUpdate` 会逐步扩容新 ReplicaSet、缩容旧 ReplicaSet；`maxSurge` 控制期望副本数之外最多临时增加多少，`maxUnavailable` 控制更新时最多不可用多少。** readiness 决定新 Pod 何时可接流量，`progressDeadlineSeconds` 可帮助暴露发布长期没有进展。
@@ -173,6 +183,16 @@ Ingress API 已冻结但没有移除计划，Kubernetes 项目建议新能力评
 
 readiness 失败会让匹配 Service 的 EndpointSlice 不再把该 Pod 作为 Ready 后端，但不会重启容器；liveness/startup 连续失败超过阈值会触发容器终止并按 restart policy 处理。参见 [Liveness, Readiness, and Startup Probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/)。
 
+#### 场景追问：启动慢、依赖不可用与进程卡死怎样配置探针？
+
+**面试官：** 启动六十秒、数据库暂不可用、事件循环卡死分别用什么？Readiness 失败会重启吗？
+
+**口语参考答案：**
+
+> Startup 判断应用是否完成启动，适合慢初始化，成功前不执行另外两种探针。Readiness 判断当前能否接收流量，失败后通常从 Service 的就绪后端中移除，不会仅因此重启容器。Liveness 判断是否需要通过重启恢复，持续失败达到阈值会触发重启。所以启动慢配 Startup，暂时无法服务配 Readiness，进程卡死且重启能恢复时配 Liveness。探针阈值要结合真实启动时间和故障恢复方式设置。
+
+**追问与易错点：** 不把所有外部依赖失败都放入 Liveness，否则数据库抖动可能触发集体重启。Readiness 摘流不会自动结束已建立连接，BullMQ Worker 也不会因此自动停止取任务。
+
 ### 24. 为什么探针配置错误会制造故障？
 
 **结论：探针是控制信号，不是越全面越好；过重、超时过短或把外部依赖放进 liveness，可能在高负载或依赖故障时触发重启风暴。**
@@ -192,7 +212,7 @@ resources:
     cpu: 250m
     memory: 256Mi
   limits:
-    cpu: "1"
+    cpu: '1'
     memory: 512Mi
 ```
 
@@ -258,7 +278,7 @@ securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
-    drop: ["ALL"]
+    drop: ['ALL']
   seccompProfile:
     type: RuntimeDefault
 ```
@@ -313,6 +333,24 @@ kubectl get pod <pod> -n <ns> -o yaml
 
 重点看 `lastState.terminated`、exit code、reason、Events 和上一实例日志。常见根因有错误命令、缺少 Secret、数据库不可达、文件权限、liveness 误杀和 OOMKilled。修复前保留证据，不要用无限重启或把 liveness 删除后就宣称问题解决。
 
+#### 场景追问：NestJS 启动失败并提示 MySQL ECONNREFUSED
+
+**面试官：** 镜像构建推送成功却反复重启；日志显示 MySQL ECONNREFUSED，怎么定位？新版本不可用怎么办？
+
+**口语参考答案：**
+
+> CrashLoopBackOff 说明容器反复退出或被重启，当前处在退避等待，不能仅据此认定镜像有问题。我会先看 Pod 状态、退出原因和 Events，再看当前及上一次容器日志。ECONNREFUSED 时核对 Pod 实际生效的数据库地址、端口、环境变量和 Secret，再看数据库是否监听、Service 与 Endpoint 是否正确，以及连通性。若发布造成可用性下降，先按预案回滚并验证服务恢复，再分析根因。
+
+```bash
+kubectl get pods -n app
+kubectl describe pod POD_NAME -n app
+kubectl logs POD_NAME -n app -c nest-api --previous
+kubectl rollout status deployment/nest-api -n app
+kubectl rollout undo deployment/nest-api -n app
+```
+
+**追问与易错点：** 命令中的名称需要替换，回滚命令仅在确认需要恢复时执行。ECONNREFUSED 与认证失败、DNS 失败、超时不同；不要把含凭证的完整环境变量打印到公共日志。回滚 Deployment 不会自动回滚数据库迁移。
+
 ### 38. Pod `Pending`、`Running` 和 `Ready` 分别说明什么？
 
 **结论：Pending 表示 Pod 尚未完成调度或至少一个容器仍未准备运行；Running 表示 Pod 已绑定节点且至少一个主要容器运行或正在启动/重启；Ready 是 condition，表示 Pod 是否满足接流量条件。**
@@ -348,37 +386,37 @@ kubectl rollout undo deployment/<name> -n <ns>
 
 ## 常用命令速查
 
-| 目标 | 命令 |
-| --- | --- |
-| 查看常用资源 | `kubectl get deploy,rs,pod,svc -n <ns> -o wide` |
-| 查看对象详情和事件 | `kubectl describe <kind> <name> -n <ns>` |
-| 查看当前/上次容器日志 | `kubectl logs <pod> -n <ns> -c <container>` / `--previous` |
-| 进入容器诊断 | `kubectl exec -it <pod> -n <ns> -c <container> -- sh` |
-| 查看最终清单 | `kubectl get <kind> <name> -n <ns> -o yaml` |
-| 查看资源使用 | `kubectl top pod -n <ns> --containers` / `kubectl top node` |
-| 查看发布状态 | `kubectl rollout status deployment/<name> -n <ns>` |
-| 查看/回滚版本 | `kubectl rollout history deployment/<name> -n <ns>` / `rollout undo` |
-| 查看服务后端 | `kubectl get svc,endpointslice -n <ns>` |
-| 查看排序后的事件 | `kubectl get events -n <ns> --sort-by=.lastTimestamp` |
-| 临时端口转发 | `kubectl port-forward -n <ns> pod/<pod> 3000:3000` |
-| 检查权限 | `kubectl auth can-i <verb> <resource> -n <ns>` |
+| 目标                  | 命令                                                                 |
+| --------------------- | -------------------------------------------------------------------- |
+| 查看常用资源          | `kubectl get deploy,rs,pod,svc -n <ns> -o wide`                      |
+| 查看对象详情和事件    | `kubectl describe <kind> <name> -n <ns>`                             |
+| 查看当前/上次容器日志 | `kubectl logs <pod> -n <ns> -c <container>` / `--previous`           |
+| 进入容器诊断          | `kubectl exec -it <pod> -n <ns> -c <container> -- sh`                |
+| 查看最终清单          | `kubectl get <kind> <name> -n <ns> -o yaml`                          |
+| 查看资源使用          | `kubectl top pod -n <ns> --containers` / `kubectl top node`          |
+| 查看发布状态          | `kubectl rollout status deployment/<name> -n <ns>`                   |
+| 查看/回滚版本         | `kubectl rollout history deployment/<name> -n <ns>` / `rollout undo` |
+| 查看服务后端          | `kubectl get svc,endpointslice -n <ns>`                              |
+| 查看排序后的事件      | `kubectl get events -n <ns> --sort-by=.lastTimestamp`                |
+| 临时端口转发          | `kubectl port-forward -n <ns> pod/<pod> 3000:3000`                   |
+| 检查权限              | `kubectl auth can-i <verb> <resource> -n <ns>`                       |
 
 命令能看到的范围受 RBAC 和集群组件影响；`kubectl top` 依赖 Metrics API。生产环境的 `exec`、端口转发和 Secret 读取都应受权限和审计约束。
 
 ## 场景速查
 
-| 场景 | 首选检查 | 常见误区 |
-| --- | --- | --- |
-| Pod 一直 Pending | Events、requests、调度约束、PVC | 只看节点当前 CPU 使用率 |
-| CrashLoopBackOff | `--previous` 日志、exit code、Events | 只增加重启次数 |
-| Running 但不接流量 | readiness、EndpointSlice、Service selector | 把 Running 当作 Ready |
-| Service 不通 | selector、端口、EndpointSlice、DNS、NetworkPolicy | 直接访问易变 Pod IP |
-| 发布卡住 | rollout status、readiness、镜像拉取、配额 | 继续发布扩大影响 |
-| OOMKilled | lastState、limit、节点压力、进程内存 | 只调大 limit 不查增长原因 |
-| HPA 不扩容 | requests、Metrics API、目标指标、maxReplicas | 认为副本数会按流量自动变化 |
-| drain 卡住 | PDB、终止宽限期、不可驱逐 Pod | 强删前不评估可用性 |
-| Worker 缩容丢任务 | SIGTERM、停止取新任务、队列恢复、幂等 | 把 Pod 补副本等同于任务恢复 |
-| Secret 泄露 | RBAC、Git/镜像/日志、审计、轮换 | 把 base64 当加密 |
+| 场景               | 首选检查                                          | 常见误区                    |
+| ------------------ | ------------------------------------------------- | --------------------------- |
+| Pod 一直 Pending   | Events、requests、调度约束、PVC                   | 只看节点当前 CPU 使用率     |
+| CrashLoopBackOff   | `--previous` 日志、exit code、Events              | 只增加重启次数              |
+| Running 但不接流量 | readiness、EndpointSlice、Service selector        | 把 Running 当作 Ready       |
+| Service 不通       | selector、端口、EndpointSlice、DNS、NetworkPolicy | 直接访问易变 Pod IP         |
+| 发布卡住           | rollout status、readiness、镜像拉取、配额         | 继续发布扩大影响            |
+| OOMKilled          | lastState、limit、节点压力、进程内存              | 只调大 limit 不查增长原因   |
+| HPA 不扩容         | requests、Metrics API、目标指标、maxReplicas      | 认为副本数会按流量自动变化  |
+| drain 卡住         | PDB、终止宽限期、不可驱逐 Pod                     | 强删前不评估可用性          |
+| Worker 缩容丢任务  | SIGTERM、停止取新任务、队列恢复、幂等             | 把 Pod 补副本等同于任务恢复 |
+| Secret 泄露        | RBAC、Git/镜像/日志、审计、轮换                   | 把 base64 当加密            |
 
 ## 自测清单
 

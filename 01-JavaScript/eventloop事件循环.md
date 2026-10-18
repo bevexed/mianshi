@@ -69,6 +69,31 @@ console.log(4);
 “await 后面的代码相当于 then 回调”是好用的近似心智模型，
 但复杂 thenable、异常和多次 await 仍应按规范的 async 语义分析。
 
+### 场景追问：下面的事件循环代码按什么顺序打印？
+
+```js
+console.log('A');
+setTimeout(() => console.log('B'), 0);
+Promise.resolve().then(() => console.log('C'));
+
+async function test() {
+	console.log('D');
+	await Promise.resolve();
+	console.log('E');
+}
+
+test();
+console.log('F');
+```
+
+**面试官：** 输出顺序是什么？为什么 await 前同步执行，后面延后？
+
+**口语参考答案：**
+
+> 顺序是 A、D、F、C、E、B。先执行当前调用栈的同步代码，调用 async 函数时立即执行 await 前面的 D，然后回到外层打印 F。Promise.then 的 C 和 await 后恢复的 E 进入微任务处理，按这个例子的入队顺序依次执行，最后再轮到定时器 B。await 暂停当前 async 函数后续执行，不会让整个 JavaScript 线程原地等待。
+
+**追问与易错点：** `setTimeout(0)` 表示满足计时条件后可被调度，不能保证立即执行。这个输出题不等于 Node.js 全部事件循环阶段的定义。
+
 ## `requestAnimationFrame` 不是普通 task
 
 `requestAnimationFrame` 属于浏览器更新渲染流程。典型情况下，当前 task 和微任务完成后，

@@ -104,6 +104,18 @@ startTransition(() => setResults(filter(value)));
 - **二维虚拟滚动**（横向也要虚拟化）——
   例如日历/表格既有行虚拟化，又有列虚拟化，还要处理冻结行列与键盘可访问性
 
+### 场景追问：React 万级列表怎么优化？
+
+**面试官：** 一万行 DOM 首次渲染卡、搜索卡、改单行导致很多行 render，分别解决什么？分页能替代虚拟列表吗？
+
+**口语参考答案：**
+
+> 先用 Performance 和 Profiler 区分 DOM、计算和组件渲染瓶颈。虚拟列表只渲染可视区域及缓冲区，减少 DOM；服务端分页减少获取量，两者可以组合。搜索请求可以防抖，重复昂贵计算可用 useMemo，useDeferredValue 则让非紧急列表更新延后，优先保持输入响应。改单行时保留未修改对象的引用，按需结合 memo 和稳定回调。key 保证身份正确，不能直接阻止其他行 render。
+
+**追问与易错点：** useDeferredValue 没有固定延迟，也不会自动减少请求；同步计算若仍长时间占住一次组件执行，还需算法优化、切分或 Worker。虚拟化还要处理动态行高、焦点和可访问性。
+
+参考：[React useDeferredValue](https://react.dev/reference/react/useDeferredValue)。
+
 ---
 
 ## 动画性能

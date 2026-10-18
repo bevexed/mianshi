@@ -30,6 +30,23 @@ useEffect(() => {
 - Strict Mode 开发环境会额外执行一次“设置 → 清理 → 设置”，
   用于暴露不对称的清理逻辑；这不是生产环境的常规流程。
 
+### 场景追问：useEffect 定时器为什么只从零增加到一？
+
+**面试官：** 空依赖 Effect 的 interval 每秒执行 `setCount(count + 1)`，为什么不持续增长？清理函数何时执行？
+
+**口语参考答案：**
+
+> 定时器回调捕获了第一次渲染时 count 为零的闭包，而空依赖不会因 count 改变而重新创建回调，所以每次都在设置一。这里我会用函数式更新 setCount(prev => prev + 1)，直接基于更新队列中的前一状态计算。把 count 加进依赖也能解决旧值，但会随每次变化重建定时器。清理函数在依赖改变、下一次 Effect setup 前，以及卸载时执行，用于释放定时器、订阅和其他资源。
+
+```tsx
+useEffect(() => {
+	const timer = setInterval(() => setCount((prev) => prev + 1), 1000);
+	return () => clearInterval(timer);
+}, []);
+```
+
+**追问与易错点：** 示例假设已导入 Hook 并声明 state。开发环境 StrictMode 可能额外执行 setup、cleanup、setup，用于检查清理是否对称。
+
 ## 不要用 Effect 代替数据流
 
 | 需求                         | 更合适的做法                                    |

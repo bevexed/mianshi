@@ -132,6 +132,16 @@ useEffect(() => {...}, [list.filter(...)])  // 每次都是新数组
 - **React Compiler 可以自动处理许多组件与值的记忆化**，
   但它是需要接入和验证的编译工具，不是安装 React 19 后必然自动生效
 
+### 场景追问：React.memo、useMemo、useCallback 有什么区别？
+
+**面试官：** 父组件 count 更新，给昂贵 Child 传了一个每次新建的函数，只加 memo 有用吗？是否都要缓存？
+
+**口语参考答案：**
+
+> 默认情况下父组件渲染会带着子组件重新执行。React.memo 在 props 比较相同时可以跳过父级带来的重复渲染，useMemo 缓存计算结果，useCallback 缓存函数引用。题目中回调每次都是新引用，只给 Child 加 memo 通常无效，需要在适合的场景下稳定回调及其他 props。缓存也有比较和维护成本，我会先用 Profiler 确认瓶颈。启用 React Compiler 时，还应结合其自动优化能力决定是否手动缓存。
+
+**追问与易错点：** memo 管不了组件自身 state 和订阅的 Context 更新。useMemo 不缓存组件，useCallback 也不会阻止函数被调用。
+
 ---
 
 ## useRef 为什么不触发重新渲染

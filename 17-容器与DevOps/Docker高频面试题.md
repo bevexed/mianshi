@@ -113,6 +113,16 @@ CMD ["node", "dist/main.js"]
 
 实际项目还要按 Node/pnpm 版本、原生依赖、workspace 布局和运行产物调整，不能机械复制。参见 [多阶段构建](https://docs.docker.com/build/building/multi-stage/)。
 
+#### 场景追问：NestJS 镜像过大且构建缓慢，怎么优化？
+
+**面试官：** `COPY . .` 后安装并构建，为什么镜像大、构建慢？为什么先复制依赖清单和锁文件？
+
+**口语参考答案：**
+
+> 镜像包含应用和运行环境的文件系统层与配置，容器是镜像的运行实例，增加可写层和进程运行状态。docker build 构建镜像，docker run 创建并启动容器。构建时先复制包清单和锁文件，按项目已有包管理器冻结安装，再复制业务源码，可让只改源码的构建复用依赖层。多阶段构建把编译和运行拆开，运行阶段只留下产物、生产依赖和必要资源，配合 dockerignore 减少构建上下文。
+
+**追问与易错点：** npm 项目通常用 `npm ci`，pnpm 项目用对应冻结安装流程；锁文件和包管理器保持一致。多阶段不会自动保留 migration、静态文件、原生依赖等运行时资源，需要按应用核对。
+
 ### 12. 镜像越小越好吗？Alpine 一定优于 Debian slim 吗？
 
 **结论：镜像大小只是一个指标，还要看 libc 兼容性、原生依赖、调试能力、安全更新和团队运维成本。** Alpine 常更小但使用 musl，某些预编译原生模块或依赖 glibc 的程序需要额外适配；slim 镜像可能更大，却有更熟悉的兼容路径。
@@ -172,6 +182,38 @@ docker run --rm -p 127.0.0.1:8080:3000 app:dev
 ```
 
 未指定宿主 IP 时，发布端口通常会绑定到所有宿主地址，可能扩大暴露面。数据库、调试端口和管理端点应按需要限制到回环地址、内网或反向代理，并由防火墙和认证继续保护；容器网络不是授权系统。
+
+### 场景追问：Nginx 如何代理前端与 API，并实现负载均衡？
+
+**面试官：** `/api/` 转发 NestJS，其他请求返回 React，三个后端实例怎么分流？能解决跨域吗？
+
+**口语参考答案：**
+
+> 反向代理为客户端提供统一入口，再把请求转给内部服务。Nginx 可以通过 location 把 /api/ 转给 upstream 后端组，其他路径提供前端静态资源和 SPA 回退。多个后端可用轮询或最少连接等策略。浏览器如果始终访问同一个协议、域名和端口，前端到 API 就是同源，内部转发到不同地址不影响这一点。还要核对路径转发规则、超时和真实客户端信息，避免代理层和应用对路径、身份的理解不同。
+
+```nginx
+upstream nest_api {
+    server nest-api-1:3000;
+    server nest-api-2:3000;
+    server nest-api-3:3000;
+}
+
+server {
+    listen 80;
+    root /srv/frontend;
+
+    location /api/ {
+        proxy_pass http://nest_api;
+        proxy_set_header Host $host;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+**追问与易错点：** 示例为 HTTP 最小路由配置，生产另配 TLS 等。这里 `proxy_pass` 不带 URI，保留 `/api/`；若写成 `http://nest_api/`，该前缀会被替换，需要与后端路由约定一致。
 
 ## 四、Compose 与运行可靠性
 
@@ -309,6 +351,16 @@ docker logs --since 30m <container>
 ```
 
 回答时补充：配置和 secret 在运行时注入；进程处理 SIGTERM；关键状态外置并有备份；资源限制基于压测；数据库迁移向前/向后兼容；镜像回滚不等于数据库自动回滚。
+
+#### 场景追问：Jenkins 构建成功，线上为什么还是旧版本？
+
+**面试官：** Jenkins、Docker、Harbor、K8s 各负责哪一段？一直使用 latest 有什么问题？如何证明运行的是新版本？
+
+**口语参考答案：**
+
+> Jenkins 编排构建发布，Docker 构建镜像，Harbor 保存制品，K8s 根据部署声明运行并滚动更新。构建成功只能证明流水线已执行的阶段成功，还要验证发布阶段、Deployment 模板和 rollout。一直覆盖 latest 时，模板可能没变，已有 Pod 不会因此自动更新；也难追踪和回滚。我会使用唯一版本标签或 digest，核对提交 SHA、仓库 digest、Deployment 镜像、Pod 实际 imageID，再请求版本接口确认真实流量到达了新实例。
+
+**追问与易错点：** `imagePullPolicy: Always` 不会主动重启已有 Pod。还要排查错误集群或命名空间、旧副本、Service 选择器和浏览器/CDN 缓存，不能只看镜像标签文字。
 
 ## 常用命令速查
 
